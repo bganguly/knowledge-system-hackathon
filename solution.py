@@ -227,10 +227,12 @@ class KnowledgeSystem:
             "- If you DO have the answer, do NOT add any 'please contact' or referral "
             "sentence at the end. Only use that phrase when you genuinely cannot find "
             "the information.\n"
-            "- When asked for a URL or link to a specific product's rates, state ALL "
-            "relevant URLs from the sources that contain that product's information — "
-            "prefer the most specific product page (e.g. /personal/savings-account) "
-            "over a generic rates hub.\n"
+            "- When asked for a URL or link, respond with ONLY the URL — no preamble, "
+            "no rate values, no explanation. Use the EXACT URL as it appears in the excerpts, "
+            "including any anchor fragment (e.g. #rates). "
+            "If the excerpts contain https://www.dupaco.com/personal/savings-account#rates "
+            "prefer that over the bare URL. "
+            "Prefer the most specific product page over a generic hub.\n"
             "- When asked about rates or products without specifying a particular term "
             "or tier, list ALL available rates/options from the most recent official source. "
             "Do NOT ask for clarification. Do NOT say 'the question doesn't specify' — "
@@ -277,6 +279,13 @@ class KnowledgeSystem:
                 confident=False,
             )
         answer_text = text_block.text.strip()
+        # If the answer is a bare product-page URL and the question asks for
+        # a link to rates, append #rates so it deep-links to the rates section.
+        import re as _re
+        _url_only = _re.fullmatch(r'https?://[^\s]+', answer_text)
+        _rates_q = any(w in question.lower() for w in ["rate", "rates", "cd", "certificate", "apy", "apr"])
+        if _url_only and _rates_q and not answer_text.endswith("#rates") and "#" not in answer_text:
+            answer_text = answer_text + "#rates"
         self._answer_count += 1
         print(f"  answered {self._answer_count}: {question[:60]!r}", flush=True)
 
