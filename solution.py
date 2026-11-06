@@ -154,7 +154,6 @@ class KnowledgeSystem:
         self._bm25_tokens: list[list[str]]     = []
         self._st_model: Optional[object]       = None
         self._embed_cache: dict[str, object]   = {}
-        self._embeddings_warmed: bool          = False
 
     # ------------------------------------------------------------------
     # ingest
@@ -188,30 +187,26 @@ class KnowledgeSystem:
 
         self._detect_temporal_conflicts(snapshot.snapshot_id, snapshot.taken_on)
         self._bm25_dirty = True
+        self._encode_new_chunks(snapshot.snapshot_id)
 
-    # ------------------------------------------------------------------
-    # answer
-    # ------------------------------------------------------------------
-
-    def _warm_embeddings(self) -> None:
-        if self._embeddings_warmed or not _HAS_ST:
-            return
-        mode = _RETRIEVAL_MODE
-        if mode not in ("dense", "hybrid"):
+    def _encode_new_chunks(self, snapshot_id: str) -> None:
+        if not _HAS_ST or _RETRIEVAL_MODE not in ("dense", "hybrid"):
             return
         if self._st_model is None:
             self._st_model = SentenceTransformer(_DENSE_MODEL)
-        texts = list({c.title + " " + c.text for c in self._all_chunks})
-        uncached = [t for t in texts if t not in self._embed_cache]
+        uncached = [
+            c.title + " " + c.text
+            for c in self._all_chunks
+            if c.snapshot_id == snapshot_id
+            and (c.title + " " + c.text) not in self._embed_cache
+        ]
         if uncached:
             vecs = self._st_model.encode(uncached, convert_to_numpy=True,
                                          show_progress_bar=False, batch_size=128)
             for t, v in zip(uncached, vecs):
                 self._embed_cache[t] = v
-        self._embeddings_warmed = True
 
     def answer(self, question: str, as_of: Optional[str] = None) -> Answer:
-        self._warm_embeddings()
         pool = self._chunks_as_of(as_of)
         if not pool:
             return Answer(
