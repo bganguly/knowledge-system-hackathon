@@ -11,9 +11,25 @@ fi
 
 KIT_DIR="$(cd "$KIT_DIR" && pwd)"
 
+ENV_FILE="$REPO_DIR/.env"
 if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
-  echo "ERROR: ANTHROPIC_API_KEY is not set."
-  exit 1
+  if [[ -f "$ENV_FILE" ]]; then
+    echo "==> Loading ANTHROPIC_API_KEY from $ENV_FILE"
+    export ANTHROPIC_API_KEY="$(grep -E '^ANTHROPIC_API_KEY=' "$ENV_FILE" | head -1 | cut -d= -f2-)"
+  fi
+fi
+
+if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
+  read -r -p "ANTHROPIC_API_KEY not set. Enter it now? [y/N] " yn
+  yn="${yn:-N}"
+  if [[ "$yn" =~ ^[Yy]$ ]]; then
+    read -r -s -p "ANTHROPIC_API_KEY: " ANTHROPIC_API_KEY
+    echo
+    export ANTHROPIC_API_KEY
+  else
+    echo "ERROR: ANTHROPIC_API_KEY required. Set it in .env or the environment."
+    exit 1
+  fi
 fi
 
 echo "==> Installing Python dependencies"
@@ -44,4 +60,4 @@ python "$KIT_DIR/harness/run_eval.py" \
   --out "$RESULTS_DIR"
 
 echo ""
-echo "==> Results written to $OUT_FILE"
+echo "==> Results written to $RESULTS_DIR"
