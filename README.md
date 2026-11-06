@@ -21,9 +21,8 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ```bash
 pip install -r requirements.txt
+export ANTHROPIC_API_KEY=sk-ant-...
 ```
-
-`ANTHROPIC_API_KEY` is loaded automatically from `.env` in this folder (gitignored). If absent, `deploy.sh` will prompt.
 
 ---
 
