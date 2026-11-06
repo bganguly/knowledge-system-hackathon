@@ -43,18 +43,9 @@ except ImportError:
 try:
     from sentence_transformers import SentenceTransformer
     import numpy as np
-    _HAS_ST   = True
-    _ST_NEURAL = True
+    _HAS_ST = True
 except ImportError:
-    _HAS_ST    = False
-    _ST_NEURAL = False
-    try:
-        import numpy as np
-        from sklearn.feature_extraction.text import TfidfVectorizer
-        from sklearn.metrics.pairwise import cosine_similarity as _cos_sim
-        _HAS_ST = True   # TF-IDF cosine as fallback "dense" mode
-    except ImportError:
-        pass
+    _HAS_ST = False
 
 import anthropic  # noqa: E402
 
@@ -161,8 +152,8 @@ class KnowledgeSystem:
         self._bm25_dirty                       = True
         self._bm25: Optional[object]           = None
         self._bm25_tokens: list[list[str]]     = []
-        self._st_model: Optional[object]       = None   # SentenceTransformer or TfidfVectorizer
-        self._embed_cache: dict[str, object]   = {}     # text → embedding (neural) or None (tfidf refit)
+        self._st_model: Optional[object]       = None
+        self._embed_cache: dict[str, object]   = {}
 
     # ------------------------------------------------------------------
     # ingest
@@ -396,23 +387,17 @@ class KnowledgeSystem:
         return self._apply_boosts_and_cap(question, pool, scores)
 
     def _cosine_scores(self, texts: list[str], query: str) -> "np.ndarray":
-        if _ST_NEURAL:
-            if self._st_model is None:
-                self._st_model = SentenceTransformer(_DENSE_MODEL)
-            uncached = [t for t in texts + [query] if t not in self._embed_cache]
-            if uncached:
-                vecs = self._st_model.encode(uncached, convert_to_numpy=True, show_progress_bar=False)
-                for t, v in zip(uncached, vecs):
-                    self._embed_cache[t] = v
-            mat   = np.stack([self._embed_cache[t] for t in texts])
-            q_vec = self._embed_cache[query]
-            norms = np.linalg.norm(mat, axis=1) * np.linalg.norm(q_vec)
-            return np.where(norms > 0, (mat @ q_vec) / norms, 0.0)
-        else:
-            # TF-IDF cosine fallback (no torch/onnx needed)
-            tfidf = TfidfVectorizer(sublinear_tf=True)
-            mat   = tfidf.fit_transform(texts + [query])
-            return _cos_sim(mat[-1], mat[:-1]).flatten()
+        if self._st_model is None:
+            self._st_model = SentenceTransformer(_DENSE_MODEL)
+        uncached = [t for t in texts + [query] if t not in self._embed_cache]
+        if uncached:
+            vecs = self._st_model.encode(uncached, convert_to_numpy=True, show_progress_bar=False)
+            for t, v in zip(uncached, vecs):
+                self._embed_cache[t] = v
+        mat   = np.stack([self._embed_cache[t] for t in texts])
+        q_vec = self._embed_cache[query]
+        norms = np.linalg.norm(mat, axis=1) * np.linalg.norm(q_vec)
+        return np.where(norms > 0, (mat @ q_vec) / norms, 0.0)
 
     def _retrieve_dense(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
         texts  = [c.title + " " + c.text for c in pool]
