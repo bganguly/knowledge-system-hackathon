@@ -57,9 +57,9 @@ mkdir -p "$SNAP_DIR"
 echo "==> Unzipping snapshots from $KIT_DIR/snapshots_zip/"
 for zip_file in "$KIT_DIR/snapshots_zip/"*.zip; do
   base="$(basename "$zip_file" .zip)"
-  if [[ ! -d "$SNAP_DIR/$base" ]]; then
+  if [[ ! -f "$SNAP_DIR/$base/manifest.json" ]]; then
     echo "    Extracting $base ..."
-    unzip -q "$zip_file" -d "$SNAP_DIR/$base"
+    unzip -q "$zip_file" -d "$SNAP_DIR"
   else
     echo "    $base already extracted, skipping."
   fi
