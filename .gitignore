@@ -1,0 +1,31 @@
+# Snapshot data must not be redistributed per assignment terms
+snapshots/
+snapshots_zip/
+*.zip
+*_baseline*/
+*_recrawl*/
+*_rebaseline*/
+*_latest*/
+
+# API keys and env files
+.env
+.env.*
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# Eval outputs (may contain site content)
+results/
+*.jsonl.out
+
+# Misc
+.DS_Store
+*.swp
