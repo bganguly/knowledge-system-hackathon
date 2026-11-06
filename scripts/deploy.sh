@@ -3,14 +3,7 @@ set -euo pipefail
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
-KIT_DIR="${1:-}"
-if [[ -z "$KIT_DIR" ]]; then
-  echo "Usage: $0 <path-to-hackathon-knowledge-kit-participant> [model]"
-  echo "  model defaults to claude-haiku-5-5"
-  echo "  e.g.: $0 ~/kit claude-sonnet-4-5"
-  exit 1
-fi
-
+KIT_DIR="${1:-"$REPO_DIR/../hackathon-knowledge-kit-participant"}"
 KIT_DIR="$(cd "$KIT_DIR" && pwd)"
 export LLM_MODEL="${2:-${LLM_MODEL:-claude-haiku-5-5}}"
 echo "==> Using model: $LLM_MODEL"

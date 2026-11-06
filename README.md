@@ -43,11 +43,12 @@ python harness/run_eval.py \
 
 Snapshots are unpacked automatically on first run. Results land in `results/` inside the kit directory.
 
-**Repeated local use** — `deploy.sh` wraps the above, handles snapshot extraction, and loads the key from `.env` if not already set. Pass an optional model as the second argument:
+**Repeated local use** — `deploy.sh` wraps the above, handles snapshot extraction, and loads the key from `.env` if not already set. It defaults to `../hackathon-knowledge-kit-participant` (sibling folder); pass a path to override. Second arg overrides the model:
 
 ```bash
-./scripts/deploy.sh /path/to/hackathon-knowledge-kit-participant
-./scripts/deploy.sh /path/to/hackathon-knowledge-kit-participant claude-sonnet-4-5
+./scripts/deploy.sh                                        # uses ../hackathon-knowledge-kit-participant
+./scripts/deploy.sh /other/path/to/kit
+./scripts/deploy.sh /other/path/to/kit claude-sonnet-4-5
 ```
 
 ---
