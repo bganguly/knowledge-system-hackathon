@@ -51,7 +51,7 @@ _PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
 _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
 _TOP_K     = 22           # chunks fed to the LLM
-_MAX_PER_URL = 5          # max chunks from a single URL
+_MAX_PER_URL = 6          # max chunks from a single URL
 _LLM_MODEL = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
 
 # Plural → singular + domain synonym expansion for BM25 query matching
@@ -76,6 +76,13 @@ _STEM_EXPAND: dict[str, list[str]] = {
     # Home$tart / grant synonyms
     "grant": ["fhlb", "home$tart", "homebuyer", "assistance"],
     "homebuyer": ["home$tart", "fhlb", "grant", "first-time"],
+    # Auto loan synonyms — "2025 vehicle" should match "2024-27 Model Year"
+    "vehicle": ["auto", "car", "automobile"],
+    "vehicles": ["auto", "car", "automobile"],
+    # CD / certificate synonyms — savings-account page has certificate products
+    "certificate": ["cd", "savings", "share"],
+    "certificates": ["certificate", "cd", "savings"],
+    "cd": ["certificate", "savings", "share"],
 }
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
@@ -144,7 +151,9 @@ class KnowledgeSystem:
             hist = self._page_history.setdefault(page.url, [])
             hist.append((snapshot.snapshot_id, snapshot.taken_on, page.markdown))
 
-            paras = [p.strip() for p in page.markdown.split("\n\n")]
+            paras = _join_short_paras(
+                [p.strip() for p in page.markdown.split("\n\n")]
+            )
             for para in paras:
                 if not para:
                     continue
@@ -417,6 +426,25 @@ def _expand_tokens(tokens: list[str]) -> list[str]:
             if singular not in tokens:
                 extra.append(singular)
     return tokens + extra
+
+
+def _join_short_paras(paras: list[str], threshold: int = 80) -> list[str]:
+    """Merge a short paragraph into the next one so headers stay with their content.
+
+    Prevents "**Lobby**" and "Monday-Friday: 8:30 a.m.–5:30 p.m." from becoming
+    separate zero-context chunks that BM25 cannot match against hour queries.
+    """
+    result: list[str] = []
+    i = 0
+    while i < len(paras):
+        p = paras[i]
+        if len(p) < threshold and i + 1 < len(paras) and paras[i + 1]:
+            result.append(p + "\n" + paras[i + 1])
+            i += 2
+        else:
+            result.append(p)
+            i += 1
+    return result
 
 
 def _chunk_para(text: str, max_len: int) -> list[str]:
