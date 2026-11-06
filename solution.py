@@ -76,6 +76,9 @@ _STEM_EXPAND: dict[str, list[str]] = {
     # Home$tart / grant synonyms
     "grant": ["fhlb", "home$tart", "homebuyer", "assistance"],
     "homebuyer": ["home$tart", "fhlb", "grant", "first-time"],
+    # Mortgage synonyms — "mortgage rates" should score home-loan rate table rows
+    "mortgage": ["home", "loan", "purchase", "refinance", "conventional"],
+    "mortgages": ["home", "loan", "purchase", "refinance", "conventional"],
     # Auto loan synonyms — "2025 vehicle" should match "2024-27 Model Year"
     "vehicle": ["auto", "car", "automobile"],
     "vehicles": ["auto", "car", "automobile"],
