@@ -59,7 +59,7 @@ Snapshots are unpacked automatically on first run. Results land in `results/` in
 |---|---|
 | **Retrieval** | `rank-bm25` — pure Python, no API calls at query time |
 | **LLM** | Anthropic Claude Haiku (`claude-haiku-5-5`) via `anthropic` SDK |
-| **Python** | 3.15.2 ([download](https://www.python.org/downloads/)) |
+| **Python** | 3.13+ ([download](https://www.python.org/downloads/)) |
 
 ---
 
