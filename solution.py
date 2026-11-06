@@ -162,6 +162,9 @@ class KnowledgeSystem:
         # same question — if so, include a conflict note in the prompt.
         conflict_note = _detect_inline_conflict(relevant, question)
 
+        # Find historical conflicts relevant to this question
+        relevant_conflicts = _match_conflicts(self._conflicts, question)
+
         system_prompt = (
             "You are a helpful assistant for Dupaco Credit Union members. "
             "Answer questions using ONLY the excerpts provided below. "
@@ -172,6 +175,7 @@ class KnowledgeSystem:
             "over calculator pages (URL contains 'calculator') or blog/newsroom pages.\n"
             "- When a calculator and a rate page disagree, state the rate-page value "
             "and note the calculator may be outdated.\n"
+            "- If historical changes are shown, mention both the old and new values.\n"
             "- If the excerpts don't contain the answer, say exactly: "
             "\"I don't know. Please contact Dupaco Credit Union directly.\"\n"
             "- Be concise. Members need a quick, accurate answer.\n"
@@ -182,6 +186,13 @@ class KnowledgeSystem:
             f"Answer this member question{date_note}: {question}\n\n"
             f"Website excerpts:\n{context}"
         )
+        if relevant_conflicts:
+            conf_lines = "\n".join(
+                f"- {c.topic}: previously {c.values[0]}, now {c.resolution} "
+                f"({c.reason})"
+                for c in relevant_conflicts
+            )
+            user_msg += f"\n\nHistorical changes detected:\n{conf_lines}"
         if conflict_note:
             user_msg += (
                 f"\n\nNote: different pages show different values. "
@@ -277,14 +288,14 @@ class KnowledgeSystem:
         # Build a small index over the pool for each call (pool may be a
         # filtered snapshot subset, so we can't reuse the global index).
         if _HAS_BM25 and pool:
-            tokens = [_tokenize(c.text) for c in pool]
+            tokens = [_tokenize(c.title + " " + c.text) for c in pool]
             bm25   = BM25Okapi(tokens)
             scores = bm25.get_scores(q_tokens)
         else:
             # Fallback: Jaccard token overlap
             q_set  = set(q_tokens)
             scores = [
-                len(q_set & set(_tokenize(c.text))) / max(len(q_set), 1)
+                len(q_set & set(_tokenize(c.title + " " + c.text))) / max(len(q_set), 1)
                 for c in pool
             ]
 
@@ -389,6 +400,19 @@ def _split_para(text: str, max_len: int) -> list[str]:
     if current:
         chunks.append(current.strip())
     return [c for c in chunks if len(c) >= _MIN_CHUNK]
+
+
+def _match_conflicts(conflicts: list[Conflict], question: str) -> list[Conflict]:
+    """Return conflicts whose values or topic keywords overlap with the question."""
+    q_tokens = set(_tokenize(question))
+    matched: list[Conflict] = []
+    for c in conflicts:
+        topic_tokens = set(_tokenize(c.topic))
+        # Match if question shares topic keywords OR explicitly mentions one of the values
+        value_tokens = set(_tokenize(" ".join(c.values)))
+        if (topic_tokens & q_tokens) or (value_tokens & q_tokens):
+            matched.append(c)
+    return matched[:6]   # cap to avoid bloating context
 
 
 def _build_context(chunks: list[_Chunk]) -> str:
