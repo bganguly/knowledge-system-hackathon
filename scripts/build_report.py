@@ -355,6 +355,7 @@ function toggleRun(i) {{
 }}
 
 buildCheckboxes();
+showLatest();
 </script>
 </body>
 </html>
