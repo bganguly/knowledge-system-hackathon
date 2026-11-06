@@ -237,11 +237,12 @@ class KnowledgeSystem:
             "just provide the full list.\n"
             "- Be concise. Members need a quick, accurate answer.\n"
             "- Do NOT invent numbers. Only state values that appear in the excerpts.\n"
-            "- NEVER include meta-commentary about the system, data, or question. "
-            "Do NOT say phrases like 'per the most recent snapshot', 'based on the excerpts', "
-            "'the member asked', 'according to the website', 'as of the latest data', "
-            "'per the information provided', or any similar framing. "
-            "Start directly with the answer content."
+            "- Answer directly — no preamble, no source attribution. "
+            "Do NOT include URLs, source names, snapshot dates, or parentheticals "
+            "that reference pages or data sources unless the question explicitly asks for a link. "
+            "Do NOT use 'as of', 'per the most recent snapshot', 'based on the excerpts', "
+            "'the member asked', 'according to the website', 'from the official rate page', "
+            "or any similar framing. Just give the facts."
         )
 
         user_msg = (
