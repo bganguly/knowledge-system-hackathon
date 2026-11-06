@@ -17,22 +17,31 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ---
 
-## Setup
+## Setup (first time)
 
 ```bash
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
----
-
 ## Running the eval
+
+**First run / evaluator use** — from inside the kit directory, point `--submission` here:
+
+```bash
+cd /path/to/hackathon-knowledge-kit-participant
+python harness/run_eval.py \
+  --submission /path/to/knowledge-system-hackathon \
+  --eval eval/public_eval.jsonl
+```
+
+Snapshots are unpacked automatically on first run. Results land in `results/` inside the kit directory.
+
+**Repeated local use** — `deploy.sh` wraps the above, handles snapshot extraction, and loads the key from `.env` if not already set:
 
 ```bash
 ./scripts/deploy.sh /path/to/hackathon-knowledge-kit-participant
 ```
-
-Unzips the five snapshot archives into `snapshots/`, runs the harness scorer, writes results to `results/`.
 
 ---
 
