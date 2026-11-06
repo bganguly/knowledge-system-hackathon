@@ -192,7 +192,8 @@ class KnowledgeSystem:
             system=system_prompt,
             messages=[{"role": "user", "content": user_msg}],
         )
-        answer_text = resp.content[0].text.strip()
+        text_block = next(b for b in resp.content if b.type == "text")
+        answer_text = text_block.text.strip()
         if conflict_note:
             answer_text = f"{answer_text}\n\nNote: {conflict_note}"
 
