@@ -49,8 +49,9 @@ import anthropic  # noqa: E402
 _WORD_RE = re.compile(r"[a-z0-9$%.]+")
 _PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
 _MAX_CHUNK = 700          # chars per chunk
-_MIN_CHUNK = 45           # skip tiny fragments
-_TOP_K     = 14           # chunks fed to the LLM
+_MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
+_TOP_K     = 22           # chunks fed to the LLM
+_MAX_PER_URL = 3          # max chunks from a single URL
 _LLM_MODEL = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
 
 
@@ -119,10 +120,11 @@ class KnowledgeSystem:
 
             paras = [p.strip() for p in page.markdown.split("\n\n")]
             for para in paras:
-                if len(para) >= _MIN_CHUNK:
-                    # Keep paragraphs at most _MAX_CHUNK chars; long ones
-                    # are sub-chunked on sentence boundaries.
-                    for sub in _split_para(para, _MAX_CHUNK):
+                if not para:
+                    continue
+                subs = _chunk_para(para, _MAX_CHUNK)
+                for sub in subs:
+                    if len(sub) >= _MIN_CHUNK:
                         self._all_chunks.append(_Chunk(
                             url=page.url,
                             title=page.title,
@@ -293,13 +295,13 @@ class KnowledgeSystem:
         ]
         combined.sort(key=lambda x: -x[0])
 
-        # Deduplicate by URL — keep the top-scoring chunk per URL
-        seen_urls: dict[str, bool] = {}
+        # Allow up to _MAX_PER_URL chunks per URL, cap at _TOP_K total
+        url_counts: dict[str, int] = {}
         result: list[_Chunk] = []
         for _, i in combined:
             url = pool[i].url
-            if url not in seen_urls:
-                seen_urls[url] = True
+            if url_counts.get(url, 0) < _MAX_PER_URL:
+                url_counts[url] = url_counts.get(url, 0) + 1
                 result.append(pool[i])
             if len(result) >= _TOP_K:
                 break
@@ -353,6 +355,22 @@ class KnowledgeSystem:
 
 def _tokenize(text: str) -> list[str]:
     return _WORD_RE.findall(text.lower())
+
+
+def _chunk_para(text: str, max_len: int) -> list[str]:
+    """Chunk a paragraph; tables get header+each-row treatment."""
+    lines = text.splitlines()
+    table_lines = [l for l in lines if l.strip().startswith("|")]
+    if len(table_lines) >= 2:
+        header = table_lines[0]
+        data_rows = [l for l in table_lines[2:] if l.strip().startswith("|")]
+        chunks = []
+        for row in data_rows:
+            combined = f"{header}\n{row}"
+            if len(combined) >= _MIN_CHUNK:
+                chunks.append(combined)
+        return chunks if chunks else [text[:max_len]]
+    return _split_para(text, max_len)
 
 
 def _split_para(text: str, max_len: int) -> list[str]:
