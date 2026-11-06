@@ -100,8 +100,8 @@ class KnowledgeSystem:
         self._snapshots: list[tuple[str, str]] = []   # (taken_on, snapshot_id)
         self._all_chunks: list[_Chunk]         = []
         self._page_history: dict[str, list[tuple[str, str, str]]] = {}
-        # (snapshot_id, taken_on, markdown)
         self._conflicts: list[Conflict]        = []
+        self._answer_count                     = 0
         self._bm25_dirty                       = True
         self._bm25: Optional[object]           = None
         self._bm25_tokens: list[list[str]]     = []
@@ -200,6 +200,8 @@ class KnowledgeSystem:
                 confident=False,
             )
         answer_text = text_block.text.strip()
+        self._answer_count += 1
+        print(f"  answered {self._answer_count}: {question[:60]!r}", flush=True)
         if conflict_note:
             answer_text = f"{answer_text}\n\nNote: {conflict_note}"
 
