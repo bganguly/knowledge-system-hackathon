@@ -12,6 +12,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -175,6 +176,7 @@ def main():
         "id": qid,
         "question": m["question"],
         "score": est,
+        "ts": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
         "answer": {
             "text": answer.text,
             "confident": answer.confident,

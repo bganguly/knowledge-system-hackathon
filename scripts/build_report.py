@@ -90,13 +90,17 @@ for ri, run in enumerate(runs):
     run_labels.append(f"{run['ts']} ({fs_str})")
 
 # WIP header (always last column)
-wip_header = (
-    '<th class="run-col wip-col" data-run="wip">'
-    '<div class="run-ts">WIP</div>'
-    '<div class="run-fs">token-check score (est.)</div>'
-    '</th>'
-    '<th class="score-col wip-col" data-run="wip">est.</th>'
-) if HAS_WIP else ""
+if HAS_WIP:
+    _wip_latest = max((r.get("ts", "") for r in wip_questions.values()), default="")
+    wip_header = (
+        '<th class="run-col wip-col" data-run="wip">'
+        f'<div class="run-ts">WIP &nbsp;<span style="font-weight:400">({len(wip_questions)} tested)</span></div>'
+        f'<div class="run-fs">est. token-check · last update: {esc(_wip_latest)}</div>'
+        '</th>'
+        '<th class="score-col wip-col" data-run="wip">est.</th>'
+    )
+else:
+    wip_header = ""
 
 run_score_sums = [0.0] * RUN_COLS
 run_score_counts = [0] * RUN_COLS
