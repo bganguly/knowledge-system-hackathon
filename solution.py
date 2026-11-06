@@ -301,15 +301,24 @@ class KnowledgeSystem:
             return self._all_chunks
 
         if as_of is None:
-            # Latest snapshot
-            target = self._snapshots[-1][0]
+            cutoff = self._snapshots[-1][0]
         else:
             eligible = [s for s in self._snapshots if s[0] <= as_of]
             if not eligible:
                 return []
-            target = eligible[-1][0]
+            cutoff = eligible[-1][0]
 
-        return [c for c in self._all_chunks if c.taken_on == target]
+        # Per URL: use whichever crawl is the most recent one at or before cutoff.
+        # URLs re-crawled in a later snapshot get their latest version; URLs that
+        # only appeared in an older snapshot fall back to that older version.
+        eligible_dates = {s[0] for s in self._snapshots if s[0] <= cutoff}
+        url_latest: dict[str, str] = {}
+        for c in self._all_chunks:
+            if c.taken_on in eligible_dates:
+                if c.url not in url_latest or c.taken_on > url_latest[c.url]:
+                    url_latest[c.url] = c.taken_on
+
+        return [c for c in self._all_chunks if url_latest.get(c.url) == c.taken_on]
 
     def _ensure_bm25(self, pool: list[_Chunk]) -> None:
         if not _HAS_BM25:
