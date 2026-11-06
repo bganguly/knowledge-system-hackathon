@@ -193,6 +193,8 @@ class KnowledgeSystem:
             messages=[{"role": "user", "content": user_msg}],
         )
         answer_text = resp.content[0].text.strip()
+        if conflict_note:
+            answer_text = f"{answer_text}\n\nNote: {conflict_note}"
 
         confident = not any(phrase in answer_text.lower() for phrase in [
             "i don't know", "i do not know", "not listed", "not available",
@@ -218,7 +220,6 @@ class KnowledgeSystem:
             text=answer_text,
             sources=sources,
             confident=confident,
-            conflict_note=conflict_note,
         )
 
     # ------------------------------------------------------------------
