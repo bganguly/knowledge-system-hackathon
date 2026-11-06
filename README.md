@@ -1,6 +1,6 @@
 # Knowledge System Hackathon — BM25 · Claude Haiku · Temporal Filtering
 
-Submission for the interface.ai hackathon: a **temporal knowledge system** that answers credit-union member questions from crawled website snapshots.
+Submission for the interface.ai hackathon: a **temporal knowledge system** that answers credit-union member questions from website snapshots taken at prior points in time.
 BM25 retrieval over chunked pages feeds top-14 excerpts into Claude Haiku for grounded answer generation.
 Conflict detection compares percentage values across snapshot dates for the same URL.
 
