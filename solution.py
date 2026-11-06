@@ -18,6 +18,11 @@ from typing import Optional
 # When running standalone, add it here.
 # ---------------------------------------------------------------------------
 def _add_harness_to_path():
+    try:
+        import contract  # noqa: F401 — already on path (run_eval.py added it)
+        return
+    except ImportError:
+        pass
     for parent in Path(__file__).resolve().parents:
         candidate = parent / "harness" / "contract.py"
         if candidate.exists():
