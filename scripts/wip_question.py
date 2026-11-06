@@ -60,7 +60,8 @@ def _build_ks():
             md_path = snap_dir / entry["file"]
             if md_path.exists():
                 pages.append(Page(url=entry["url"], title=entry.get("title", ""),
-                                  markdown=md_path.read_text(encoding="utf-8")))
+                                  markdown=md_path.read_text(encoding="utf-8"),
+                                  fetched_at=entry.get("fetched_at", "")))
         snapshot = Snapshot(
             snapshot_id=manifest["snapshot_id"],
             taken_on=manifest["taken_on"],
