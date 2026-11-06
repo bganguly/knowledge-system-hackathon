@@ -236,12 +236,17 @@ class KnowledgeSystem:
             "Do NOT ask for clarification. Do NOT say 'the question doesn't specify' — "
             "just provide the full list.\n"
             "- Be concise. Members need a quick, accurate answer.\n"
-            "- Do NOT invent numbers. Only state values that appear in the excerpts."
+            "- Do NOT invent numbers. Only state values that appear in the excerpts.\n"
+            "- NEVER include meta-commentary about the system, data, or question. "
+            "Do NOT say phrases like 'per the most recent snapshot', 'based on the excerpts', "
+            "'the member asked', 'according to the website', 'as of the latest data', "
+            "'per the information provided', or any similar framing. "
+            "Start directly with the answer content."
         )
 
         user_msg = (
-            f"Answer this member question{date_note}: {question}\n\n"
-            f"Website excerpts:\n{context}"
+            f"Question{date_note}: {question}\n\n"
+            f"Excerpts:\n{context}"
         )
         if relevant_conflicts:
             conf_lines = "\n".join(
