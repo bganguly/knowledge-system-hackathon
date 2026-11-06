@@ -181,8 +181,9 @@ for row_num, qid in enumerate(all_ids, 1):
             wip_src = "last"
 
         # accumulate projected score
-        wip_total_weight += weight
-        wip_weighted_score += (wsc or 0.0) * weight
+        if wsc is not None:
+            wip_total_weight += weight
+            wip_weighted_score += wsc * weight
 
         highlight = ' style="background:#fffbe6"' if wip_src == "wip" else ""
         td_wip = (

@@ -83,14 +83,20 @@ def _estimate_score(answer_text: str, meta: dict) -> float:
         if tok.lower() in text_lower:
             return 0.0
 
-    if must_inc:
-        hits = sum(1 for tok in must_inc if tok.lower() in text_lower)
-        correctness = hits / len(must_inc)
-    else:
-        # no must_include — assume correct if answer is not "I don't know"
-        correctness = 0.0 if "i don't know" in text_lower else 0.85
+    if not must_inc:
+        # No must_include tokens — estimate from answer shape.
+        # list_completeness questions expect multiple rates/values listed.
+        import re
+        rate_count = len(re.findall(r'\d+\.\d+\s*%', answer_text))
+        if rate_count >= 3:
+            return 1.0
+        elif rate_count >= 1:
+            return 0.5
+        else:
+            return 0.0
 
-    return round(0.85 * correctness, 4)
+    hits = sum(1 for tok in must_inc if tok.lower() in text_lower)
+    return round(0.85 * (hits / len(must_inc)), 4)
 
 # ---------------------------------------------------------------------------
 # WIP file helpers
