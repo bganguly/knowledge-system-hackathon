@@ -5,7 +5,9 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 KIT_DIR="${1:-"$REPO_DIR/../hackathon-knowledge-kit-participant"}"
 KIT_DIR="$(cd "$KIT_DIR" && pwd)"
-export LLM_MODEL="${2:-${LLM_MODEL:-claude-haiku-5-5}}"
+DEFAULT_MODEL="${2:-${LLM_MODEL:-claude-haiku-5-5}}"
+read -r -p "Model [$DEFAULT_MODEL]: " _model_input
+export LLM_MODEL="${_model_input:-$DEFAULT_MODEL}"
 echo "==> Using model: $LLM_MODEL"
 
 ENV_FILE="$REPO_DIR/.env"
