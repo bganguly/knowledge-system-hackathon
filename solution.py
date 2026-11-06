@@ -237,12 +237,13 @@ class KnowledgeSystem:
             "just provide the full list.\n"
             "- Be concise. Members need a quick, accurate answer.\n"
             "- Do NOT invent numbers. Only state values that appear in the excerpts.\n"
-            "- Answer directly — no preamble, no source attribution. "
+            "- Answer directly — no preamble, no source attribution, no trailing disclaimers. "
             "Do NOT include URLs, source names, snapshot dates, or parentheticals "
             "that reference pages or data sources unless the question explicitly asks for a link. "
-            "Do NOT use 'as of', 'per the most recent snapshot', 'based on the excerpts', "
+            "Do NOT use 'as of', 'rates shown are current', 'rates are subject to change', "
+            "'per the most recent snapshot', 'based on the excerpts', "
             "'the member asked', 'according to the website', 'from the official rate page', "
-            "or any similar framing. Just give the facts."
+            "or any similar framing or closing disclaimer. Just give the facts."
         )
 
         user_msg = (
