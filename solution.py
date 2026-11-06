@@ -402,17 +402,31 @@ def _split_para(text: str, max_len: int) -> list[str]:
     return [c for c in chunks if len(c) >= _MIN_CHUNK]
 
 
+_HISTORY_RE = re.compile(
+    r'\b(previous|prior|before|changed|used to|formerly|was|past|old|historic|'
+    r'earlier|previously|update|any.*pay)\b', re.I
+)
+
 def _match_conflicts(conflicts: list[Conflict], question: str) -> list[Conflict]:
-    """Return conflicts whose values or topic keywords overlap with the question."""
-    q_tokens = set(_tokenize(question))
+    """Return conflicts relevant to this question.
+
+    Conservative: only injects when the question asks about a historical change
+    (keywords: previously, changed, used to, etc.) OR explicitly mentions one of
+    the specific conflict values (e.g., '0.35%').  Avoids injecting old rates
+    into general rate questions, which causes stale-trap hits.
+    """
+    asks_history = bool(_HISTORY_RE.search(question))
     matched: list[Conflict] = []
     for c in conflicts:
-        topic_tokens = set(_tokenize(c.topic))
-        # Match if question shares topic keywords OR explicitly mentions one of the values
-        value_tokens = set(_tokenize(" ".join(c.values)))
-        if (topic_tokens & q_tokens) or (value_tokens & q_tokens):
+        if asks_history:
             matched.append(c)
-    return matched[:6]   # cap to avoid bloating context
+        else:
+            # Only match when question literally contains one of the conflict values
+            for val in c.values:
+                if val in question:
+                    matched.append(c)
+                    break
+    return matched[:4]   # cap to avoid bloating context
 
 
 def _build_context(chunks: list[_Chunk]) -> str:
