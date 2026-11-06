@@ -43,9 +43,18 @@ except ImportError:
 try:
     from sentence_transformers import SentenceTransformer
     import numpy as np
-    _HAS_ST = True
+    _HAS_ST   = True
+    _ST_NEURAL = True
 except ImportError:
-    _HAS_ST = False
+    _HAS_ST    = False
+    _ST_NEURAL = False
+    try:
+        import numpy as np
+        from sklearn.feature_extraction.text import TfidfVectorizer
+        from sklearn.metrics.pairwise import cosine_similarity as _cos_sim
+        _HAS_ST = True   # TF-IDF cosine as fallback "dense" mode
+    except ImportError:
+        pass
 
 import anthropic  # noqa: E402
 
@@ -152,8 +161,8 @@ class KnowledgeSystem:
         self._bm25_dirty                       = True
         self._bm25: Optional[object]           = None
         self._bm25_tokens: list[list[str]]     = []
-        self._st_model: Optional[object]       = None   # SentenceTransformer, lazy
-        self._embed_cache: dict[str, object]   = {}     # text hash → embedding
+        self._st_model: Optional[object]       = None   # SentenceTransformer or TfidfVectorizer
+        self._embed_cache: dict[str, object]   = {}     # text → embedding (neural) or None (tfidf refit)
 
     # ------------------------------------------------------------------
     # ingest
@@ -386,25 +395,28 @@ class KnowledgeSystem:
 
         return self._apply_boosts_and_cap(question, pool, scores)
 
-    def _ensure_st(self) -> None:
-        if self._st_model is None:
-            self._st_model = SentenceTransformer(_DENSE_MODEL)
-
-    def _embed(self, texts: list[str]) -> "np.ndarray":
-        self._ensure_st()
-        uncached = [t for t in texts if t not in self._embed_cache]
-        if uncached:
-            vecs = self._st_model.encode(uncached, convert_to_numpy=True, show_progress_bar=False)
-            for t, v in zip(uncached, vecs):
-                self._embed_cache[t] = v
-        return np.stack([self._embed_cache[t] for t in texts])
+    def _cosine_scores(self, texts: list[str], query: str) -> "np.ndarray":
+        if _ST_NEURAL:
+            if self._st_model is None:
+                self._st_model = SentenceTransformer(_DENSE_MODEL)
+            uncached = [t for t in texts + [query] if t not in self._embed_cache]
+            if uncached:
+                vecs = self._st_model.encode(uncached, convert_to_numpy=True, show_progress_bar=False)
+                for t, v in zip(uncached, vecs):
+                    self._embed_cache[t] = v
+            mat   = np.stack([self._embed_cache[t] for t in texts])
+            q_vec = self._embed_cache[query]
+            norms = np.linalg.norm(mat, axis=1) * np.linalg.norm(q_vec)
+            return np.where(norms > 0, (mat @ q_vec) / norms, 0.0)
+        else:
+            # TF-IDF cosine fallback (no torch/onnx needed)
+            tfidf = TfidfVectorizer(sublinear_tf=True)
+            mat   = tfidf.fit_transform(texts + [query])
+            return _cos_sim(mat[-1], mat[:-1]).flatten()
 
     def _retrieve_dense(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
         texts  = [c.title + " " + c.text for c in pool]
-        vecs   = self._embed(texts)
-        q_vec  = self._embed([question])[0]
-        norms  = np.linalg.norm(vecs, axis=1) * np.linalg.norm(q_vec)
-        scores = np.where(norms > 0, (vecs @ q_vec) / norms, 0.0)
+        scores = self._cosine_scores(texts, question)
         return self._apply_boosts_and_cap(question, pool, scores.tolist())
 
     def _retrieve_hybrid(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
@@ -413,21 +425,14 @@ class KnowledgeSystem:
         bm25     = BM25Okapi(tokens)
         bm25_raw = bm25.get_scores(q_tokens)
 
-        # Narrow to top BM25 candidates, then re-rank with dense
-        top_idx = sorted(range(len(pool)), key=lambda i: -bm25_raw[i])[:_HYBRID_BM25_K]
+        top_idx    = sorted(range(len(pool)), key=lambda i: -bm25_raw[i])[:_HYBRID_BM25_K]
         candidates = [pool[i] for i in top_idx]
+        texts      = [c.title + " " + c.text for c in candidates]
+        cosine     = self._cosine_scores(texts, question)
 
-        texts  = [c.title + " " + c.text for c in candidates]
-        vecs   = self._embed(texts)
-        q_vec  = self._embed([question])[0]
-        norms  = np.linalg.norm(vecs, axis=1) * np.linalg.norm(q_vec)
-        cosine = np.where(norms > 0, (vecs @ q_vec) / norms, 0.0)
-
-        # Normalize bm25 scores for the candidates and blend 50/50
-        bm25_sub = np.array([bm25_raw[i] for i in top_idx], dtype=float)
-        bm25_max = bm25_sub.max() or 1.0
-        bm25_norm = bm25_sub / bm25_max
-        blended = 0.5 * bm25_norm + 0.5 * cosine
+        bm25_sub  = np.array([bm25_raw[i] for i in top_idx], dtype=float)
+        bm25_max  = bm25_sub.max() or 1.0
+        blended   = 0.5 * (bm25_sub / bm25_max) + 0.5 * cosine
 
         return self._apply_boosts_and_cap(question, candidates, blended.tolist())
 
