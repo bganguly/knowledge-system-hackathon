@@ -36,15 +36,12 @@ done
 RESULTS_DIR="$REPO_DIR/results"
 mkdir -p "$RESULTS_DIR"
 
-TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
-OUT_FILE="$RESULTS_DIR/eval_${TIMESTAMP}.json"
-
 echo "==> Running harness eval"
 python "$KIT_DIR/harness/run_eval.py" \
   --submission "$REPO_DIR" \
   --eval "$KIT_DIR/eval/public_eval.jsonl" \
   --snapshots "$SNAP_DIR" \
-  --output "$OUT_FILE"
+  --out "$RESULTS_DIR"
 
 echo ""
 echo "==> Results written to $OUT_FILE"
