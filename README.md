@@ -24,6 +24,12 @@ pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
 ```
 
+The LLM model defaults to `claude-haiku-5-5`. Override with the `LLM_MODEL` env var:
+
+```bash
+export LLM_MODEL=claude-sonnet-4-5   # or any other claude-* model ID
+```
+
 ## Running the eval
 
 **First run / evaluator use** — from inside the kit directory, point `--submission` here:
@@ -37,10 +43,11 @@ python harness/run_eval.py \
 
 Snapshots are unpacked automatically on first run. Results land in `results/` inside the kit directory.
 
-**Repeated local use** — `deploy.sh` wraps the above, handles snapshot extraction, and loads the key from `.env` if not already set:
+**Repeated local use** — `deploy.sh` wraps the above, handles snapshot extraction, and loads the key from `.env` if not already set. Pass an optional model as the second argument:
 
 ```bash
 ./scripts/deploy.sh /path/to/hackathon-knowledge-kit-participant
+./scripts/deploy.sh /path/to/hackathon-knowledge-kit-participant claude-sonnet-4-5
 ```
 
 ---

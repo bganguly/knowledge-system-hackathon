@@ -6,6 +6,7 @@ Requires ANTHROPIC_API_KEY in the environment.
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from pathlib import Path
@@ -45,7 +46,7 @@ _PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
 _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 45           # skip tiny fragments
 _TOP_K     = 14           # chunks fed to the LLM
-_LLM_MODEL = "claude-haiku-5-5"
+_LLM_MODEL = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
 
 
 def _url_authority(url: str) -> int:
