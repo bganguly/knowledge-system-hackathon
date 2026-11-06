@@ -29,8 +29,9 @@ if [[ -z "${ANTHROPIC_API_KEY:-}" ]]; then
   fi
 fi
 
+PYTHON="${PYTHON:-python3}"
 echo "==> Installing Python dependencies"
-pip install -q -r "$REPO_DIR/requirements.txt"
+"$PYTHON" -m pip install -q -r "$REPO_DIR/requirements.txt"
 
 SNAP_DIR="$REPO_DIR/snapshots"
 mkdir -p "$SNAP_DIR"
@@ -50,7 +51,7 @@ RESULTS_DIR="$REPO_DIR/results"
 mkdir -p "$RESULTS_DIR"
 
 echo "==> Running harness eval"
-python "$KIT_DIR/harness/run_eval.py" \
+"$PYTHON" "$KIT_DIR/harness/run_eval.py" \
   --submission "$REPO_DIR" \
   --eval "$KIT_DIR/eval/public_eval.jsonl" \
   --snapshots "$SNAP_DIR" \
