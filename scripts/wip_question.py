@@ -96,6 +96,8 @@ def _estimate_score(answer_text: str, meta: dict) -> float:
             return 0.0
 
     hits = sum(1 for tok in must_inc if tok.lower() in text_lower)
+    if hits == len(must_inc):
+        return 1.0
     return round(0.85 * (hits / len(must_inc)), 4)
 
 # ---------------------------------------------------------------------------
