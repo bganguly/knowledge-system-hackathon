@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 
 KIT_DIR="${1:-}"
 if [[ -z "$KIT_DIR" ]]; then

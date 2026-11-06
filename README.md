@@ -30,16 +30,10 @@ pip install -r requirements.txt
 ## Running the eval
 
 ```bash
-./deploy.sh /path/to/hackathon-knowledge-kit-participant
+./scripts/deploy.sh /path/to/hackathon-knowledge-kit-participant
 ```
 
 Unzips the five snapshot archives into `snapshots/`, runs the harness scorer, writes results to `results/`.
-
-To clean up extracted data:
-
-```bash
-./infra-down.sh
-```
 
 ---
 
