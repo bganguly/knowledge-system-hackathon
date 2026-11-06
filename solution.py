@@ -191,8 +191,14 @@ class KnowledgeSystem:
             max_tokens=512,
             system=system_prompt,
             messages=[{"role": "user", "content": user_msg}],
+            thinking={"type": "disabled"},
         )
-        text_block = next(b for b in resp.content if b.type == "text")
+        text_block = next((b for b in resp.content if b.type == "text"), None)
+        if text_block is None:
+            return Answer(
+                text="I don't know. Please contact Dupaco Credit Union directly.",
+                confident=False,
+            )
         answer_text = text_block.text.strip()
         if conflict_note:
             answer_text = f"{answer_text}\n\nNote: {conflict_note}"
