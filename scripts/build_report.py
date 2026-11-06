@@ -11,6 +11,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 RUNS_DIR = REPO / "results" / "runs"
 EVAL_FILE = REPO.parent / "hackathon-knowledge-kit-participant" / "eval" / "public_eval.jsonl"
+WIP_FILE = REPO / "results" / "wip.jsonl"
 OUT = REPO / "results" / "comparison.html"
 
 eval_meta: dict[str, dict] = {}
@@ -52,6 +53,15 @@ if not runs:
     print("No run files found in", RUNS_DIR)
     raise SystemExit(1)
 
+# Load WIP questions (overrides last-run answers for tested questions)
+wip_questions: dict[str, dict] = {}
+if WIP_FILE.exists():
+    with open(WIP_FILE) as f:
+        for line in f:
+            if line.strip():
+                r = json.loads(line)
+                wip_questions[r["id"]] = r
+
 all_ids = sorted(
     {qid for run in runs for qid in run["questions"]},
     key=lambda x: int(x.split("-")[1]) if x.split("-")[1].isdigit() else 0,
@@ -61,6 +71,7 @@ def esc(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 RUN_COLS = len(runs)
+HAS_WIP = bool(wip_questions)
 
 header_cells = ""
 run_labels = []
@@ -78,8 +89,22 @@ for ri, run in enumerate(runs):
     )
     run_labels.append(f"{run['ts']} ({fs_str})")
 
+# WIP header (always last column)
+wip_header = (
+    '<th class="run-col wip-col" data-run="wip">'
+    '<div class="run-ts">WIP</div>'
+    '<div class="run-fs">token-check score (est.)</div>'
+    '</th>'
+    '<th class="score-col wip-col" data-run="wip">est.</th>'
+) if HAS_WIP else ""
+
 run_score_sums = [0.0] * RUN_COLS
 run_score_counts = [0] * RUN_COLS
+
+# WIP projected score: use wip score for tested questions, last run score for rest
+last_run_questions = runs[-1]["questions"] if runs else {}
+wip_total_weight = 0.0
+wip_weighted_score = 0.0
 
 rows_html = ""
 for row_num, qid in enumerate(all_ids, 1):
@@ -100,13 +125,12 @@ for row_num, qid in enumerate(all_ids, 1):
             snap_ids_text = ", ".join(snap_ids)
             break
 
-    weight = meta.get("weight", 1)
-    weight_str = str(weight) if weight is not None else "1"
+    weight = meta.get("weight", 1) or 1
 
     td_meta = (
         f'<td class="num-col">{row_num}</td>'
         f'<td class="snap-col">{esc(snap_ids_text)}</td>'
-        f'<td class="wt-col">{weight_str}</td>'
+        f'<td class="wt-col">{weight}</td>'
         f'<td class="q-col">{question}</td>'
         f'<td class="exp-col">{expected}</td>'
         f'<td class="must-col">{must_text}</td>'
@@ -133,7 +157,42 @@ for row_num, qid in enumerate(all_ids, 1):
             f'<td class="score-col" data-run="{i}">{sc_str}</td>'
         )
 
-    rows_html += f'<tr>{td_meta}{td_runs}</tr>\n'
+    # WIP column
+    td_wip = ""
+    if HAS_WIP:
+        if qid in wip_questions:
+            wrow = wip_questions[qid]
+            wans = wrow.get("answer") or {}
+            watext = esc((wans.get("text") or "")[:300])
+            wsc = wrow.get("score")
+            wsc_str = f"{wsc:.2f}" if wsc is not None else "?"
+            wip_src = "wip"
+        else:
+            # fall back to last run
+            lrow = last_run_questions.get(qid) or {}
+            lans = lrow.get("answer") or {}
+            watext = esc((lans.get("text") or "")[:300])
+            wsc = lrow.get("score")
+            wsc_str = f"{wsc:.2f}" if wsc is not None else "—"
+            wip_src = "last"
+
+        # accumulate projected score
+        wip_total_weight += weight
+        wip_weighted_score += (wsc or 0.0) * weight
+
+        highlight = ' style="background:#fffbe6"' if wip_src == "wip" else ""
+        td_wip = (
+            f'<td class="run-col wip-col ans-col" data-run="wip"{highlight}>'
+            f'<div class="ans-text">{watext}</div>'
+            f'</td>'
+            f'<td class="score-col wip-col" data-run="wip"{highlight}>{wsc_str}</td>'
+        )
+
+    rows_html += f'<tr>{td_meta}{td_runs}{td_wip}</tr>\n'
+
+# WIP projected qa_score
+wip_proj = (wip_weighted_score / wip_total_weight) if wip_total_weight > 0 and HAS_WIP else None
+wip_tested_count = len(wip_questions)
 
 avg_cells = ""
 for i, run in enumerate(runs):
@@ -148,13 +207,24 @@ for i, run in enumerate(runs):
         f'<td class="score-col avg-cell" data-run="{i}"></td>'
     )
 
+wip_avg_cell = ""
+if HAS_WIP:
+    proj_str = f"{wip_proj:.4f}" if wip_proj is not None else "—"
+    wip_avg_cell = (
+        f'<td class="run-col wip-col avg-cell" data-run="wip" style="background:#fffbe6">'
+        f'<span style="font-size:0.78rem">est. debug_qa: {proj_str} '
+        f'&nbsp; ({wip_tested_count}/{len(all_ids)} tested)</span>'
+        f'</td>'
+        f'<td class="score-col wip-col avg-cell" data-run="wip" style="background:#fffbe6"></td>'
+    )
+
 rows_html += (
     f'<tr class="avg-row">'
     f'<td class="num-col avg-cell"></td>'
     f'<td class="snap-col avg-cell"></td>'
     f'<td class="wt-col avg-cell"></td>'
     f'<td class="q-col avg-cell" colspan="3">Summary (from report.json)</td>'
-    f'{avg_cells}'
+    f'{avg_cells}{wip_avg_cell}'
     f'</tr>\n'
 )
 
@@ -211,6 +281,7 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
   background:var(--code-bg); white-space:nowrap; }}
 .run-cb-label input {{ margin:0; cursor:pointer; }}
 [data-hidden] {{ display:none; }}
+.wip-col {{ border-left: 2px solid #f59e0b !important; }}
 </style>
 </head>
 <body>
@@ -233,6 +304,7 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
     <th>Expected Answer</th>
     <th class="must-col">must_include</th>
     {header_cells}
+    {wip_header}
   </tr>
 </thead>
 <tbody>
