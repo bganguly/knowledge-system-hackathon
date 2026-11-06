@@ -51,8 +51,34 @@ _PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
 _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
 _TOP_K     = 22           # chunks fed to the LLM
-_MAX_PER_URL = 3          # max chunks from a single URL
+_MAX_PER_URL = 5          # max chunks from a single URL
 _LLM_MODEL = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
+
+# Plural → singular + domain synonym expansion for BM25 query matching
+_STEM_EXPAND: dict[str, list[str]] = {
+    "branches": ["branch"],
+    "locations": ["location"],
+    "employees": ["employee"],
+    "offices": ["office"],
+    "tiers": ["tier"],
+    "accounts": ["account"],
+    "loans": ["loan"],
+    "members": ["member"],
+    "services": ["service"],
+    # Rate/APY synonyms — boost retrieval of numeric rate chunks
+    "rates": ["rate", "apy", "dividend"],
+    "interest": ["apy", "dividend", "rate"],
+    "apy": ["rate", "dividend", "interest"],
+    # Contact synonyms — help match phone/contact pages
+    "contact": ["phone", "call", "800"],
+    "update": ["change", "modify", "edit"],
+    "information": ["info", "details", "data"],
+    # Home$tart / grant synonyms
+    "grant": ["fhlb", "home$tart", "homebuyer", "assistance"],
+    "homebuyer": ["home$tart", "fhlb", "grant", "first-time"],
+}
+
+_RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
 
 
 def _url_authority(url: str) -> int:
@@ -176,6 +202,12 @@ class KnowledgeSystem:
             "- When a calculator and a rate page disagree, state the rate-page value "
             "and note the calculator may be outdated.\n"
             "- If historical changes are shown, mention both the old and new values.\n"
+            "- 'Savings tiers' or 'savings account tiers' means the Share Savings "
+            "product specifically. Investor's Choice Money Market is a separate "
+            "account category — do NOT treat it as a savings tier.\n"
+            "- For factual Dupaco statistics (number of branches, employee count), "
+            "use the value cited most consistently across sources; newsroom/about "
+            "boilerplate is reliable for these facts.\n"
             "- If the excerpts don't contain the answer, say exactly: "
             "\"I don't know. Please contact Dupaco Credit Union directly.\"\n"
             "- Be concise. Members need a quick, accurate answer.\n"
@@ -283,7 +315,7 @@ class KnowledgeSystem:
         if not pool:
             return []
 
-        q_tokens = _tokenize(question)
+        q_tokens = _expand_tokens(_tokenize(question))
 
         # Build a small index over the pool for each call (pool may be a
         # filtered snapshot subset, so we can't reuse the global index).
@@ -293,17 +325,26 @@ class KnowledgeSystem:
             scores = bm25.get_scores(q_tokens)
         else:
             # Fallback: Jaccard token overlap
-            q_set  = set(q_tokens)
+            q_set  = set(q_tokens)  # already expanded
             scores = [
                 len(q_set & set(_tokenize(c.title + " " + c.text))) / max(len(q_set), 1)
                 for c in pool
             ]
 
-        # Blend BM25 score with URL authority boost
-        combined = [
-            (scores[i] * (1.0 + 0.25 * pool[i].authority), i)
-            for i in range(len(pool))
-        ]
+        # Determine if this is a rate-focused query
+        q_set = set(q_tokens)
+        query_is_rate = bool(q_set & _RATE_TERMS)
+
+        # Blend BM25 score with URL authority boost (reduced multiplier so
+        # newsroom pages with unique content aren't buried by product pages)
+        combined = []
+        for i in range(len(pool)):
+            s = scores[i] * (1.0 + 0.1 * pool[i].authority)
+            # Boost chunks that contain actual percentage values when the query
+            # is about rates — ensures the rate table row beats marketing prose
+            if query_is_rate and _PCT_RE.search(pool[i].text):
+                s *= 1.5
+            combined.append((s, i))
         combined.sort(key=lambda x: -x[0])
 
         # Allow up to _MAX_PER_URL chunks per URL, cap at _TOP_K total
@@ -366,6 +407,16 @@ class KnowledgeSystem:
 
 def _tokenize(text: str) -> list[str]:
     return _WORD_RE.findall(text.lower())
+
+
+def _expand_tokens(tokens: list[str]) -> list[str]:
+    """Add singular forms for plural query tokens so BM25 matches both."""
+    extra: list[str] = []
+    for t in tokens:
+        for singular in _STEM_EXPAND.get(t, []):
+            if singular not in tokens:
+                extra.append(singular)
+    return tokens + extra
 
 
 def _chunk_para(text: str, max_len: int) -> list[str]:
