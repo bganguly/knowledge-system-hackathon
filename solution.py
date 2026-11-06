@@ -208,9 +208,11 @@ class KnowledgeSystem:
             "standard vs jumbo, 2024-27 vs 2017-23 model year — never mix them.\n"
             "- Prefer official rate pages (URL contains /loans/, /savings/, /rates/) "
             "over calculator pages (URL contains 'calculator') or blog/newsroom pages.\n"
-            "- When a calculator and a rate page disagree, state the rate-page value "
-            "and note the calculator may be outdated.\n"
-            "- If historical changes are shown, mention both the old and new values.\n"
+            "- When sources disagree, state ONLY the value from the most authoritative "
+            "source (official rate page > calculator > blog). "
+            "NEVER mention the stale or calculator value in your answer.\n"
+            "- Never reference superseded, historical, or outdated values. "
+            "Report the current authoritative value only, or say you don't know.\n"
             "- 'Savings tiers' or 'savings account tiers' means the Share Savings "
             "product specifically. Investor's Choice Money Market is a separate "
             "account category — do NOT treat it as a savings tier.\n"
@@ -256,8 +258,6 @@ class KnowledgeSystem:
         answer_text = text_block.text.strip()
         self._answer_count += 1
         print(f"  answered {self._answer_count}: {question[:60]!r}", flush=True)
-        if conflict_note:
-            answer_text = f"{answer_text}\n\nNote: {conflict_note}"
 
         confident = not any(phrase in answer_text.lower() for phrase in [
             "i don't know", "i do not know", "not listed", "not available",
