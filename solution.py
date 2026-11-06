@@ -40,6 +40,13 @@ try:
 except ImportError:
     _HAS_BM25 = False
 
+try:
+    from sentence_transformers import SentenceTransformer
+    import numpy as np
+    _HAS_ST = True
+except ImportError:
+    _HAS_ST = False
+
 import anthropic  # noqa: E402
 
 # ---------------------------------------------------------------------------
@@ -52,7 +59,10 @@ _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
 _TOP_K     = 22           # chunks fed to the LLM
 _MAX_PER_URL = 6          # max chunks from a single URL
-_LLM_MODEL = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
+_LLM_MODEL       = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
+_RETRIEVAL_MODE  = os.environ.get("RETRIEVAL_MODE", "bm25")   # bm25 | dense | hybrid
+_DENSE_MODEL     = "all-MiniLM-L6-v2"
+_HYBRID_BM25_K   = 50   # BM25 candidates before dense re-rank in hybrid mode
 
 # Plural → singular + domain synonym expansion for BM25 query matching
 _STEM_EXPAND: dict[str, list[str]] = {
@@ -142,6 +152,8 @@ class KnowledgeSystem:
         self._bm25_dirty                       = True
         self._bm25: Optional[object]           = None
         self._bm25_tokens: list[list[str]]     = []
+        self._st_model: Optional[object]       = None   # SentenceTransformer, lazy
+        self._embed_cache: dict[str, object]   = {}     # text hash → embedding
 
     # ------------------------------------------------------------------
     # ingest
@@ -157,12 +169,14 @@ class KnowledgeSystem:
             paras = _join_short_paras(
                 [p.strip() for p in page.markdown.split("\n\n")]
             )
+            seen_in_page: set[str] = set()
             for para in paras:
                 if not para:
                     continue
                 subs = _chunk_para(para, _MAX_CHUNK)
                 for sub in subs:
-                    if len(sub) >= _MIN_CHUNK:
+                    if len(sub) >= _MIN_CHUNK and sub not in seen_in_page:
+                        seen_in_page.add(sub)
                         self._all_chunks.append(_Chunk(
                             url=page.url,
                             title=page.title,
@@ -346,52 +360,91 @@ class KnowledgeSystem:
 
         return [c for c in self._all_chunks if c.taken_on == target]
 
-    def _ensure_bm25(self, pool: list[_Chunk]) -> None:
-        if not _HAS_BM25:
-            return
-        # Rebuild only when the global chunk list changed
-        if self._bm25_dirty or len(self._bm25_tokens) != len(self._all_chunks):
-            self._bm25_tokens = [_tokenize(c.text) for c in self._all_chunks]
-            self._bm25_dirty  = False
-            self._bm25        = None   # invalidated
-
     def _retrieve(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
         if not pool:
             return []
+        mode = _RETRIEVAL_MODE
+        if mode == "dense" and _HAS_ST:
+            return self._retrieve_dense(question, pool)
+        if mode == "hybrid" and _HAS_BM25 and _HAS_ST:
+            return self._retrieve_hybrid(question, pool)
+        return self._retrieve_bm25(question, pool)
 
+    def _retrieve_bm25(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
         q_tokens = _expand_tokens(_tokenize(question))
 
-        # Build a small index over the pool for each call (pool may be a
-        # filtered snapshot subset, so we can't reuse the global index).
-        if _HAS_BM25 and pool:
+        if _HAS_BM25:
             tokens = [_tokenize(c.title + " " + c.text) for c in pool]
             bm25   = BM25Okapi(tokens)
             scores = bm25.get_scores(q_tokens)
         else:
-            # Fallback: Jaccard token overlap
-            q_set  = set(q_tokens)  # already expanded
+            q_set  = set(q_tokens)
             scores = [
                 len(q_set & set(_tokenize(c.title + " " + c.text))) / max(len(q_set), 1)
                 for c in pool
             ]
 
-        # Determine if this is a rate-focused query
-        q_set = set(q_tokens)
+        return self._apply_boosts_and_cap(question, pool, scores)
+
+    def _ensure_st(self) -> None:
+        if self._st_model is None:
+            self._st_model = SentenceTransformer(_DENSE_MODEL)
+
+    def _embed(self, texts: list[str]) -> "np.ndarray":
+        self._ensure_st()
+        uncached = [t for t in texts if t not in self._embed_cache]
+        if uncached:
+            vecs = self._st_model.encode(uncached, convert_to_numpy=True, show_progress_bar=False)
+            for t, v in zip(uncached, vecs):
+                self._embed_cache[t] = v
+        return np.stack([self._embed_cache[t] for t in texts])
+
+    def _retrieve_dense(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
+        texts  = [c.title + " " + c.text for c in pool]
+        vecs   = self._embed(texts)
+        q_vec  = self._embed([question])[0]
+        norms  = np.linalg.norm(vecs, axis=1) * np.linalg.norm(q_vec)
+        scores = np.where(norms > 0, (vecs @ q_vec) / norms, 0.0)
+        return self._apply_boosts_and_cap(question, pool, scores.tolist())
+
+    def _retrieve_hybrid(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
+        q_tokens = _expand_tokens(_tokenize(question))
+        tokens   = [_tokenize(c.title + " " + c.text) for c in pool]
+        bm25     = BM25Okapi(tokens)
+        bm25_raw = bm25.get_scores(q_tokens)
+
+        # Narrow to top BM25 candidates, then re-rank with dense
+        top_idx = sorted(range(len(pool)), key=lambda i: -bm25_raw[i])[:_HYBRID_BM25_K]
+        candidates = [pool[i] for i in top_idx]
+
+        texts  = [c.title + " " + c.text for c in candidates]
+        vecs   = self._embed(texts)
+        q_vec  = self._embed([question])[0]
+        norms  = np.linalg.norm(vecs, axis=1) * np.linalg.norm(q_vec)
+        cosine = np.where(norms > 0, (vecs @ q_vec) / norms, 0.0)
+
+        # Normalize bm25 scores for the candidates and blend 50/50
+        bm25_sub = np.array([bm25_raw[i] for i in top_idx], dtype=float)
+        bm25_max = bm25_sub.max() or 1.0
+        bm25_norm = bm25_sub / bm25_max
+        blended = 0.5 * bm25_norm + 0.5 * cosine
+
+        return self._apply_boosts_and_cap(question, candidates, blended.tolist())
+
+    def _apply_boosts_and_cap(
+        self, question: str, pool: list[_Chunk], scores: list[float]
+    ) -> list[_Chunk]:
+        q_set         = set(_expand_tokens(_tokenize(question)))
         query_is_rate = bool(q_set & _RATE_TERMS)
 
-        # Blend BM25 score with URL authority boost (reduced multiplier so
-        # newsroom pages with unique content aren't buried by product pages)
         combined = []
-        for i in range(len(pool)):
-            s = scores[i] * (1.0 + 0.1 * pool[i].authority)
-            # Boost chunks that contain actual percentage values when the query
-            # is about rates — ensures the rate table row beats marketing prose
+        for i, s in enumerate(scores):
+            s = s * (1.0 + 0.1 * pool[i].authority)
             if query_is_rate and _PCT_RE.search(pool[i].text):
                 s *= 1.5
             combined.append((s, i))
         combined.sort(key=lambda x: -x[0])
 
-        # Allow up to _MAX_PER_URL chunks per URL, cap at _TOP_K total
         url_counts: dict[str, int] = {}
         result: list[_Chunk] = []
         for _, i in combined:
@@ -401,7 +454,6 @@ class KnowledgeSystem:
                 result.append(pool[i])
             if len(result) >= _TOP_K:
                 break
-
         return result
 
     def _detect_temporal_conflicts(self, current_sid: str, current_date: str):
