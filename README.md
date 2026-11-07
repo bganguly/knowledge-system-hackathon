@@ -8,10 +8,16 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ## Eval run log
 
-| Run (UTC) | Config | Results |
+| | 2026-11-05 22:52:16 | 2026-11-06 22:31:25 |
 |---|---|---|
-| 2026-11-05 22:52:16 | model=`claude-haiku-5-5` TOP_K=22 MAX_PER_URL=6 MAX_CHUNK=700 MIN_CHUNK=20 | **qa=0.7194** · final=0.6812 · 28 full / 2 partial / 10 fail (of 40) |
-| 2026-11-06 22:31:25 | model=`claude-haiku-5-5` TOP_K=22 MAX_PER_URL=6 MAX_CHUNK=700 MIN_CHUNK=20 | **qa=0.6667** · final=0.6605 · 27 full / 2 partial / 11 fail (of 40) |
+| model | `claude-haiku-5-5` | `claude-haiku-5-5` |
+| top_k | 22 | 22 |
+| max_per_url | 6 | 6 |
+| max_chunk | 700 | 700 |
+| min_chunk | 20 | 20 |
+| qa_score | **0.7194** | **0.6667** |
+| final_score | 0.6812 | 0.6605 |
+| full / partial / fail | 28 / 2 / 10 | 27 / 2 / 11 |
 
 Same committed code, different runs — spread of ~0.05 reflects LLM non-determinism.
 
