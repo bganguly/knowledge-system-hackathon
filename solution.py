@@ -229,8 +229,20 @@ class KnowledgeSystem:
 
         print(f"[embed] {snapshot_id}: encoding {len(uncached)} chunks ...", flush=True)
         t0 = time.time()
-        vecs = self._st_model.encode(uncached, convert_to_numpy=True,
-                                     show_progress_bar=False, batch_size=64)
+        import numpy as _np
+        BATCH = 256
+        all_vecs = []
+        for i in range(0, len(uncached), BATCH):
+            chunk_batch = uncached[i:i + BATCH]
+            all_vecs.append(self._st_model.encode(chunk_batch, convert_to_numpy=True,
+                                                  show_progress_bar=False))
+            done = min(i + BATCH, len(uncached))
+            elapsed_so_far = time.time() - t0
+            rate = done / elapsed_so_far if elapsed_so_far > 0 else 0
+            eta = (len(uncached) - done) / rate if rate > 0 else 0
+            print(f"[embed]   {done}/{len(uncached)} chunks  "
+                  f"({rate:.0f}/s  ETA {eta:.0f}s)", flush=True)
+        vecs = _np.concatenate(all_vecs, axis=0)
         elapsed = time.time() - t0
         batch: dict = {}
         for t, v in zip(uncached, vecs):
