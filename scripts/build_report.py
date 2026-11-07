@@ -326,7 +326,7 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
   <tr>
     <th class="num-col">#</th>
     <th class="snap-col">snapshot</th>
-    <th class="wt-col">wt</th>
+    <th class="wt-col" id="wt-th" onclick="sortByWt()" style="cursor:pointer" title="Sort by weight">wt</th>
     <th>Question</th>
     <th>Expected Answer</th>
     <th class="must-col">must_include</th>
@@ -378,6 +378,21 @@ function toggleRun(i) {{
 
 buildCheckboxes();
 showLatest();
+
+let _wtAsc = null;
+function sortByWt() {{
+  const tbody = document.querySelector('tbody');
+  const rows = Array.from(tbody.querySelectorAll('tr:not(.avg-row)'));
+  const avgRow = tbody.querySelector('.avg-row');
+  _wtAsc = _wtAsc === true ? false : true;
+  rows.sort((a, b) => {{
+    const av = parseFloat(a.querySelector('.wt-col')?.textContent) || 0;
+    const bv = parseFloat(b.querySelector('.wt-col')?.textContent) || 0;
+    return _wtAsc ? av - bv : bv - av;
+  }});
+  rows.forEach(r => tbody.insertBefore(r, avgRow));
+  document.getElementById('wt-th').textContent = 'wt ' + (_wtAsc ? '▲' : '▼');
+}}
 </script>
 </body>
 </html>
