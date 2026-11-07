@@ -12,27 +12,28 @@ Conflict detection compares percentage values across snapshot dates for the same
 |---|---|
 | Dense / hybrid retrieval (sentence-transformers) | Tried (Phase 5). Re-ranker demotes rate-table chunks in favour of blog/calculator content; row 2 BM25=1 → hybrid=0. Reverted. |
 | Markdown heading splits, tables kept intact | Credit union pages are HTML→text; heading structure unreliable. Table-row chunks outperform whole-table chunks for rate queries — keeping tables intact would hurt `tier_disambiguation`. |
-| Adjacent chunk retrieval | Noted as useful for `branch_info` (address + hours often in adjacent paragraphs). Not implemented; isolated enough to add later without touching main chunking. |
+| Adjacent chunk retrieval | **Implemented.** For the top-3 BM25 results, immediate neighbors from the same URL are appended. `branch_info` jumped from 0.47 → 0.87; overall final_score +0.03 vs best prior haiku run. |
 | Opus model | Sonnet p95 already 4.38s vs haiku's ~2.5s, costing speed-pillar points. Opus latency would be worse; unless accuracy improves to ~0.75+, net final_score is lower than haiku. |
 
 ---
 
 ## Eval run log
 
-| | 2026-11-05 22:52:16 | 2026-11-06 22:31:25 | 2026-11-06 22:49:34 | 2026-11-06 22:59:32 |
-|---|---|---|---|---|
-| model | `claude-haiku-5-5` | `claude-haiku-5-5` | `claude-haiku-5-5` | `claude-sonnet-5-5` |
-| top_k | 22 | 22 | 22 | 22 |
-| max_per_url | 6 | 6 | 6 | 6 |
-| max_chunk | 700 | 700 | 700 | 700 |
-| min_chunk | 20 | 20 | 20 | 20 |
-| pass | 28 | 27 | 25 | 27 |
-| fail | 10 | 11 | 13 | 11 |
-| partial pass | 2 | 2 | 2 | 2 |
-| p95 latency | 4.27s | 2.49s | 2.24s | 4.38s |
-| final_score | **0.6812** | **0.6605** | **0.6132** | **0.6464** |
+| | 2026-11-05 22:52:16 | 2026-11-06 22:31:25 | 2026-11-06 22:49:34 | 2026-11-06 22:59:32 | 2026-11-06 23:18:47 |
+|---|---|---|---|---|---|
+| model | `claude-haiku-5-5` | `claude-haiku-5-5` | `claude-haiku-5-5` | `claude-sonnet-5-5` | `claude-haiku-5-5` |
+| adjacent chunks | no | no | no | no | **yes** |
+| top_k | 22 | 22 | 22 | 22 | 22 |
+| max_per_url | 6 | 6 | 6 | 6 | 6 |
+| max_chunk | 700 | 700 | 700 | 700 | 700 |
+| min_chunk | 20 | 20 | 20 | 20 | 20 |
+| pass | 28 | 27 | 25 | 27 | 27 |
+| fail | 10 | 11 | 13 | 11 | 8 |
+| partial pass | 2 | 2 | 2 | 2 | 5 |
+| p95 latency | 4.27s | 2.49s | 2.24s | 4.38s | 2.42s |
+| final_score | **0.6812** | **0.6605** | **0.6132** | **0.6464** | **0.7157** |
 
-Haiku runs: same committed code, spread of ~0.07 reflects LLM non-determinism. Sonnet: higher accuracy pillar (0.668 vs 0.620) but slower p95 cancels the gain.
+Adjacent chunk retrieval (top-3 results get neighbors from same URL) lifted `branch_info` from 0.47 → 0.87. Haiku: same committed code, spread of ~0.07 reflects LLM non-determinism. Sonnet: higher accuracy but slower p95 cancels the gain.
 
 ---
 

@@ -452,7 +452,26 @@ class KnowledgeSystem:
                 for c in pool
             ]
 
-        return self._apply_boosts_and_cap(question, pool, scores)
+        result = self._apply_boosts_and_cap(question, pool, scores)
+        return self._add_adjacent(result, pool)
+
+    def _add_adjacent(self, result: list[_Chunk], pool: list[_Chunk]) -> list[_Chunk]:
+        """Append immediate neighbors (same URL) for the top-3 results."""
+        pool_pos = {id(c): i for i, c in enumerate(pool)}
+        seen     = {id(c) for c in result}
+        extras: list[_Chunk] = []
+        for c in result[:3]:
+            ci = pool_pos.get(id(c))
+            if ci is None:
+                continue
+            for delta in (-1, 1):
+                ni = ci + delta
+                if 0 <= ni < len(pool):
+                    neighbor = pool[ni]
+                    if id(neighbor) not in seen and neighbor.url == c.url:
+                        seen.add(id(neighbor))
+                        extras.append(neighbor)
+        return result + extras
 
     def _cosine_scores(self, texts: list[str], query: str) -> "np.ndarray":
         if self._st_model is None:
