@@ -35,7 +35,7 @@ def _load_eval() -> tuple[list[str], dict]:
                 r = json.loads(line)
                 all_ids.append(r["id"])
                 meta[r["id"]] = r
-    all_ids.sort(key=lambda x: int(x.split("-")[1]))
+    # keep eval file order — row n in deploy.sh == line n of the eval file
     return all_ids, meta
 
 # ---------------------------------------------------------------------------
@@ -179,6 +179,9 @@ def main():
     answer = ks.answer(m["question"], as_of=as_of)
     elapsed = time.time() - t0
 
+    _pool = ks._chunks_as_of(as_of)
+    _debug_chunks = ks._retrieve(m["question"], _pool) if _pool else []
+
     est = _estimate_score(answer.text, m)
     print(f"\nAnswer ({elapsed:.1f}s):\n{answer.text}")
     print(f"\nEstimated score (token check only): {est:.4f}")
@@ -196,6 +199,10 @@ def main():
                 for s in (answer.sources or [])
             ],
         },
+        "chunks": [
+            {"url": c.url, "snapshot_id": c.snapshot_id, "text": c.text[:300], "authority": c.authority}
+            for c in _debug_chunks
+        ],
     }
     _write_wip(wip)
     print(f"\nSaved to {WIP_FILE.name}  ({len(wip)} question(s) tracked, mode={_MODE})")

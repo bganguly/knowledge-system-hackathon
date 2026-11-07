@@ -62,10 +62,13 @@ if WIP_FILE.exists():
                 r = json.loads(line)
                 wip_questions[r["id"]] = r
 
-all_ids = sorted(
-    {qid for run in runs for qid in run["questions"]},
-    key=lambda x: int(x.split("-")[1]) if x.split("-")[1].isdigit() else 0,
-)
+eval_order: list[str] = []
+if EVAL_FILE.exists():
+    with open(EVAL_FILE) as f:
+        for line in f:
+            if line.strip():
+                eval_order.append(json.loads(line)["id"])
+all_ids = [qid for qid in eval_order if any(qid in run["questions"] for run in runs)]
 
 def esc(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
