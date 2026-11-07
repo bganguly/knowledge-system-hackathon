@@ -11,12 +11,20 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 RUNS_DIR = REPO / "results" / "runs"
 EVAL_FILE = REPO.parent / "hackathon-knowledge-kit-participant" / "eval" / "public_eval.jsonl"
+CUSTOM_EVAL_FILE = REPO / "eval" / "custom_eval.jsonl"
+CHUNK_DEBUG_FILE = REPO / "results" / "chunks_debug.json"
 WIP_FILE = REPO / "results" / "wip_bm25.jsonl"
 OUT = REPO / "results" / "comparison.html"
 
 eval_meta: dict[str, dict] = {}
 if EVAL_FILE.exists():
     with open(EVAL_FILE) as f:
+        for line in f:
+            if line.strip():
+                r = json.loads(line)
+                eval_meta[r["id"]] = r
+if CUSTOM_EVAL_FILE.exists():
+    with open(CUSTOM_EVAL_FILE) as f:
         for line in f:
             if line.strip():
                 r = json.loads(line)
@@ -67,7 +75,19 @@ if EVAL_FILE.exists():
         for line in f:
             if line.strip():
                 eval_order.append(json.loads(line)["id"])
+if CUSTOM_EVAL_FILE.exists():
+    with open(CUSTOM_EVAL_FILE) as f:
+        for line in f:
+            if line.strip():
+                eval_order.append(json.loads(line)["id"])
 all_ids = [qid for qid in eval_order if any(qid in run["questions"] for run in runs)]
+
+chunk_debug: dict[str, list] = {}
+if CHUNK_DEBUG_FILE.exists():
+    try:
+        chunk_debug = json.loads(CHUNK_DEBUG_FILE.read_text())
+    except Exception:
+        pass
 
 def esc(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
@@ -178,9 +198,31 @@ for row_num, qid in enumerate(all_ids, 1):
             judge_parts.append(f'<span class="jlat">{lat_str}</span>')
         judge_html = "<br>".join(judge_parts) if judge_parts else "—"
 
+        chunk_dbg_html = ""
+        if i == RUN_COLS - 1 and sc is not None and sc < 1.0:
+            dbg_key = meta.get("question", qid) + "|||" + (meta.get("as_of") or "")
+            dbg_chunks = chunk_debug.get(dbg_key, [])
+            if dbg_chunks:
+                cp = []
+                for ci, c in enumerate(dbg_chunks, 1):
+                    path = (c.get("url") or "").replace("https://www.dupaco.com", "")
+                    snippet = esc(c.get("text") or "")
+                    auth = c.get("authority", "")
+                    cp.append(
+                        f'<div class="chunk-item"><b>{ci}. [{auth}] {esc(path)}</b>'
+                        f'<pre class="chunk-pre">{snippet}</pre></div>'
+                    )
+                chunk_dbg_html = (
+                    f'<details class="chunk-toggle">'
+                    f'<summary>{len(dbg_chunks)} chunk(s) retrieved</summary>'
+                    f'<div class="chunk-body">{"".join(cp)}</div>'
+                    f'</details>'
+                )
+
         td_runs += (
             f'<td class="run-col ans-col" data-run="{i}">'
             f'<div class="ans-text">{atext}</div>'
+            f'{chunk_dbg_html}'
             f'</td>'
             f'<td class="score-col" data-run="{i}">{sc_str}</td>'
             f'<td class="judge-col" data-run="{i}">{judge_html}</td>'

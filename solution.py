@@ -8,10 +8,12 @@ from __future__ import annotations
 
 import datetime
 import hashlib
+import json
 import os
 import pickle
 import re
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -158,6 +160,8 @@ class KnowledgeSystem:
         self._bm25_tokens: list[list[str]]     = []
         self._st_model: Optional[object]       = None
         self._embed_cache: dict[str, object]   = {}
+        self._chunk_debug: dict[str, list]     = {}
+        self._debug_lock                       = threading.Lock()
 
     # ------------------------------------------------------------------
     # ingest
@@ -264,6 +268,22 @@ class KnowledgeSystem:
             )
 
         relevant = self._retrieve(question, pool)
+
+        _dbg_data = [
+            {"url": c.url, "text": c.text[:400], "authority": c.authority, "snapshot_id": c.snapshot_id}
+            for c in relevant
+        ]
+        _dbg_key = question + "|||" + (as_of or "")
+        with self._debug_lock:
+            self._chunk_debug[_dbg_key] = _dbg_data
+            _dbg_path = Path(__file__).parent / "results" / "chunks_debug.json"
+            try:
+                _dbg_path.parent.mkdir(exist_ok=True)
+                with open(_dbg_path, "w") as _dbg_f:
+                    json.dump(self._chunk_debug, _dbg_f)
+            except Exception:
+                pass
+
         if not relevant:
             return Answer(
                 text="I don't know. This information doesn't appear on the website.",

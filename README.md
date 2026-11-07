@@ -74,6 +74,24 @@ The slight drop in final_score reflects two custom question misses dragging down
 
 ---
 
+## 40-public vs 45-cumulative (run 2026-11-06 23:58)
+
+Both columns are from the same eval run (`run_2026-11-06_23-58-23_custom.jsonl`). The 40-only column is the public subset extracted from that run; no separate run was executed.
+
+| | 40 public (subset) | 45 combined (cumulative) |
+|---|---|---|
+| questions | 40 | 45 |
+| qa_score (weighted) | 0.6818 | **0.6854** |
+| pass | 25 | 28 |
+| partial | 5 | 6 |
+| fail | 10 | 11 |
+| p95 latency | 2.73s | 2.58s |
+| final_score | — | **0.6683** |
+
+`final_score` is computed by the harness over the full 45-question run only (consistency and speed pillars span all questions and cannot be split cleanly by subset).
+
+---
+
 ## How it works
 
 | Stage | Implementation |
