@@ -236,6 +236,7 @@ class KnowledgeSystem:
         self._embed_cache: dict[str, object]   = {}
         self._chunk_debug: dict[str, list]     = {}
         self._debug_lock                       = threading.Lock()
+        self._answer_cache: dict[tuple, Answer] = {}
 
     # ------------------------------------------------------------------
     # ingest
@@ -334,6 +335,11 @@ class KnowledgeSystem:
         print(f"[embed] {snapshot_id}: done in {elapsed:.1f}s, cached to disk", flush=True)
 
     def answer(self, question: str, as_of: Optional[str] = None) -> Answer:
+        _cache_key = (question.strip(), str(as_of))
+        if _cache_key in self._answer_cache:
+            print(f"  [cache-hit] {question[:60]!r}", flush=True)
+            return self._answer_cache[_cache_key]
+
         pool = self._chunks_as_of(as_of)
         if not pool:
             return Answer(
@@ -510,12 +516,15 @@ class KnowledgeSystem:
             answer_text = canonical
             url_override_note = reason
 
-        return Answer(
+        result = Answer(
             text=answer_text,
             sources=sources,
             confident=confident,
             conflict_note=url_override_note,
         )
+        if confident:
+            self._answer_cache[_cache_key] = result
+        return result
 
     # ------------------------------------------------------------------
     # conflicts
