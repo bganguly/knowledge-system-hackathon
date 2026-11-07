@@ -325,7 +325,7 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 <table>
 <thead>
   <tr>
-    <th class="num-col">#</th>
+    <th class="num-col" id="num-th" onclick="sortByNum()" style="cursor:pointer" title="Sort by row number">#</th>
     <th class="snap-col">snapshot</th>
     <th class="wt-col" id="wt-th" onclick="sortByWt()" style="cursor:pointer" title="Sort by weight">wt</th>
     <th>Question</th>
@@ -380,19 +380,29 @@ function toggleRun(i) {{
 buildCheckboxes();
 showLatest();
 
-let _wtAsc = null;
-function sortByWt() {{
+let _wtAsc = null, _numAsc = null;
+function _sortTable(colClass, asc) {{
   const tbody = document.querySelector('tbody');
   const rows = Array.from(tbody.querySelectorAll('tr:not(.avg-row)'));
   const avgRow = tbody.querySelector('.avg-row');
-  _wtAsc = _wtAsc === true ? false : true;
   rows.sort((a, b) => {{
-    const av = parseFloat(a.querySelector('.wt-col')?.textContent) || 0;
-    const bv = parseFloat(b.querySelector('.wt-col')?.textContent) || 0;
-    return _wtAsc ? av - bv : bv - av;
+    const av = parseFloat(a.querySelector('.' + colClass)?.textContent) || 0;
+    const bv = parseFloat(b.querySelector('.' + colClass)?.textContent) || 0;
+    return asc ? av - bv : bv - av;
   }});
   rows.forEach(r => tbody.insertBefore(r, avgRow));
+}}
+function sortByWt() {{
+  _wtAsc = _wtAsc === true ? false : true; _numAsc = null;
+  _sortTable('wt-col', _wtAsc);
   document.getElementById('wt-th').textContent = 'wt ' + (_wtAsc ? '▲' : '▼');
+  document.getElementById('num-th').textContent = '#';
+}}
+function sortByNum() {{
+  _numAsc = _numAsc === true ? false : true; _wtAsc = null;
+  _sortTable('num-col', _numAsc);
+  document.getElementById('num-th').textContent = '# ' + (_numAsc ? '▲' : '▼');
+  document.getElementById('wt-th').textContent = 'wt';
 }}
 </script>
 </body>
