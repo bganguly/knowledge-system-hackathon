@@ -62,7 +62,7 @@ _PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
 _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
 _TOP_K     = 22           # chunks fed to the LLM
-_MAX_PER_URL = 3          # max chunks from a single URL
+_MAX_PER_URL = 6          # max chunks from a single URL
 _LLM_MODEL       = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
 _RETRIEVAL_MODE  = os.environ.get("RETRIEVAL_MODE", "bm25")   # bm25 | dense | hybrid
 _DENSE_MODEL     = "all-MiniLM-L6-v2"
@@ -103,21 +103,6 @@ _STEM_EXPAND: dict[str, list[str]] = {
 }
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
-
-# Boilerplate patterns — chunks matching these are dropped at ingest time.
-# Targets: image-only lines, navigation header-links, "Handpicked for You"
-# sidebars, and standalone "Keep reading" CTAs found on newsroom/blog pages.
-_BOILERPLATE_RES = [
-    re.compile(r'^!\[.*\]\(https?://[^)]*\)\s*$', re.DOTALL),
-    re.compile(r'^#{1,6}\s*\[.+\]\(https?://[^)]*\)\s*$', re.DOTALL),
-    re.compile(r'^\[Keep reading\]\(', re.I),
-    re.compile(r'^#{1,6}\s*Handpicked for You', re.I),
-]
-
-
-def _is_boilerplate(text: str) -> bool:
-    s = text.strip()
-    return any(p.match(s) for p in _BOILERPLATE_RES)
 
 
 def _url_authority(url: str) -> int:
@@ -195,8 +180,6 @@ class KnowledgeSystem:
                     continue
                 subs = _chunk_para(para, _MAX_CHUNK)
                 for sub in subs:
-                    if _is_boilerplate(sub):
-                        continue
                     if len(sub) >= _MIN_CHUNK and sub not in seen_in_page:
                         seen_in_page.add(sub)
                         snap_chunks.append(_Chunk(
