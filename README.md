@@ -49,15 +49,6 @@ Adjacent chunk retrieval (top-3 results get neighbors from same URL) lifted `bra
 
 5 questions written against facts verifiable in the snapshot markdown files, appended to the 40 public questions for a 45-question combined run.
 
-**Run summary (45 questions, haiku, adjacent chunks + historical boost)**
-
-| | 40 public (subset) | 45 combined |
-|---|---|---|
-| questions | 40 | 45 |
-| qa_score (weighted) | 0.6620 | **0.6814** |
-| p95 latency | 2.49s | 2.36s |
-| final_score | — | **0.6686** |
-
 **Per custom question**
 
 | id | category | score | verdict | note |
