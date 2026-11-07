@@ -6,9 +6,12 @@ Requires ANTHROPIC_API_KEY in the environment.
 
 from __future__ import annotations
 
+import hashlib
 import os
+import pickle
 import re
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -189,22 +192,53 @@ class KnowledgeSystem:
         self._bm25_dirty = True
         self._encode_new_chunks(snapshot.snapshot_id)
 
+    def _embed_cache_path(self, snapshot_id: str) -> Path:
+        key = hashlib.md5(f"{_DENSE_MODEL}:{snapshot_id}".encode()).hexdigest()[:12]
+        cache_dir = Path(__file__).parent / ".embed_cache"
+        cache_dir.mkdir(exist_ok=True)
+        return cache_dir / f"{key}.pkl"
+
     def _encode_new_chunks(self, snapshot_id: str) -> None:
         if not _HAS_ST or _RETRIEVAL_MODE not in ("dense", "hybrid"):
             return
-        if self._st_model is None:
-            self._st_model = SentenceTransformer(_DENSE_MODEL)
-        uncached = [
+
+        texts = [
             c.title + " " + c.text
             for c in self._all_chunks
             if c.snapshot_id == snapshot_id
-            and (c.title + " " + c.text) not in self._embed_cache
         ]
-        if uncached:
-            vecs = self._st_model.encode(uncached, convert_to_numpy=True,
-                                         show_progress_bar=False, batch_size=128)
-            for t, v in zip(uncached, vecs):
-                self._embed_cache[t] = v
+        if not texts:
+            return
+
+        cache_path = self._embed_cache_path(snapshot_id)
+        if cache_path.exists():
+            with open(cache_path, "rb") as f:
+                stored: dict = pickle.load(f)
+            self._embed_cache.update(stored)
+            print(f"[embed] {snapshot_id}: loaded {len(stored)} vectors from disk cache",
+                  flush=True)
+            return
+
+        if self._st_model is None:
+            print(f"[embed] loading model {_DENSE_MODEL} ...", flush=True)
+            self._st_model = SentenceTransformer(_DENSE_MODEL)
+
+        uncached = [t for t in texts if t not in self._embed_cache]
+        if not uncached:
+            return
+
+        print(f"[embed] {snapshot_id}: encoding {len(uncached)} chunks ...", flush=True)
+        t0 = time.time()
+        vecs = self._st_model.encode(uncached, convert_to_numpy=True,
+                                     show_progress_bar=False, batch_size=64)
+        elapsed = time.time() - t0
+        batch: dict = {}
+        for t, v in zip(uncached, vecs):
+            self._embed_cache[t] = v
+            batch[t] = v
+        with open(cache_path, "wb") as f:
+            pickle.dump(batch, f)
+        print(f"[embed] {snapshot_id}: done in {elapsed:.1f}s, cached to disk", flush=True)
 
     def answer(self, question: str, as_of: Optional[str] = None) -> Answer:
         pool = self._chunks_as_of(as_of)
