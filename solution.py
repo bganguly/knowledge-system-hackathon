@@ -410,13 +410,12 @@ class KnowledgeSystem:
             return self._all_chunks
 
         if as_of is None:
-            # Latest snapshot
-            target = self._snapshots[-1][0]
+            target = max(s[0] for s in self._snapshots)
         else:
             eligible = [s for s in self._snapshots if s[0] <= as_of]
             if not eligible:
                 return []
-            target = eligible[-1][0]
+            target = max(s[0] for s in eligible)
 
         return [c for c in self._all_chunks if c.taken_on == target]
 

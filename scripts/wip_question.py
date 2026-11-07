@@ -49,7 +49,7 @@ def _build_ks():
     from contract import Snapshot, Page  # noqa: F401
 
     ks = sol.KnowledgeSystem()
-    for snap_dir in sorted(SNAP_DIR.iterdir(), reverse=True):
+    for snap_dir in sorted(SNAP_DIR.iterdir()):
         manifest_path = snap_dir / "manifest.json"
         if not manifest_path.exists():
             continue
