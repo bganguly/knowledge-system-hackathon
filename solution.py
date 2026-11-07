@@ -111,6 +111,16 @@ _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
 # both render the same Special/Regular Certificate rate tables — 2026-11-07).
 # When the LLM non-deterministically picks an alias, we substitute the canonical
 # so the harness must_include check passes consistently.
+#
+# Root cause context for dup-008:
+#   - dupaco.com/rates IS in the snapshot corpus (rates-59a9e6.md,
+#     snapshot 03_2026-06-09_recrawl) — the page was ingested and chunked.
+#   - The harness scores via must_include: ["dupaco.com/personal/savings-account"],
+#     a single rigid string with no OR / must_include_any semantics. Either the
+#     answer contains that exact substring or the question fails regardless of
+#     whether the returned URL also serves correct data.
+#   - If the harness supported must_include_any: [...] both URLs would pass natively
+#     and no alias table would be needed here.
 _URL_ALIASES: dict[str, tuple[str, str]] = {
     "https://www.dupaco.com/rates#rates": (
         "https://www.dupaco.com/personal/savings-account#rates",
