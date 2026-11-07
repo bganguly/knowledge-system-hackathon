@@ -126,9 +126,13 @@ def main() -> None:
         chunks        = ks._retrieve(question_text, pool)
 
         row = {
-            "id":       q.get("id"),
-            "question": question_text,
-            "as_of":    as_of,
+            "id":              q.get("id"),
+            "question":        question_text,
+            "as_of":           as_of,
+            "category":        q.get("category", ""),
+            "weight":          q.get("weight", 1.0),
+            "expected_answer": q.get("expected_answer", ""),
+            "must_include":    q.get("must_include", []),
             "chunks": [
                 {
                     "rank":        idx + 1,
