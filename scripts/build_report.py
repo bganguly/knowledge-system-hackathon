@@ -39,13 +39,12 @@ for rp in run_files:
                 row = json.loads(line)
                 questions[row["id"]] = row
     final_score = None
+    qa_score = None
     rjson = report_files.get(ts)
     if rjson and Path(rjson).exists():
         with open(rjson) as f:
             rdata = json.load(f)
         final_score = rdata.get("final_score")
-    qa_score = None
-    if rjson and Path(rjson).exists():
         qa_score = rdata.get("qa_score")
     runs.append({"ts": display_ts, "questions": questions, "final_score": final_score, "qa_score": qa_score})
 
@@ -74,7 +73,7 @@ def esc(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 RUN_COLS = len(runs)
-HAS_WIP = True
+HAS_WIP = bool(wip_questions)
 
 header_cells = ""
 run_labels = []
@@ -86,13 +85,14 @@ for ri, run in enumerate(runs):
     header_cells += (
         f'<th class="run-col" data-run="{ri}">'
         f'<div class="run-ts">{esc(run["ts"])}</div>'
-        f'<div class="run-fs">final: {fs_str} &nbsp; debug_qa: {qs_str}</div>'
+        f'<div class="run-fs">final: {fs_str} &nbsp; qa: {qs_str}</div>'
         f'</th>'
         f'<th class="score-col" data-run="{ri}">score</th>'
+        f'<th class="judge-col" data-run="{ri}">judge</th>'
     )
     run_labels.append(f"{run['ts']} ({fs_str})")
 
-# WIP header — always rendered (5 columns: answer, score, chunks, conflicts, match)
+# WIP header
 _wip_latest = max((r.get("ts", "") for r in wip_questions.values()), default="") if wip_questions else ""
 wip_header = (
     '<th class="run-col wip-col" data-run="wip">'
@@ -100,15 +100,12 @@ wip_header = (
     f'<div class="run-fs">est. token-check · last update: {esc(_wip_latest)}</div>'
     '</th>'
     '<th class="score-col wip-col" data-run="wip">est.</th>'
-    '<th class="dbg-col wip-col" data-run="wip">BM25 Chunks</th>'
-    '<th class="dbg-col wip-col" data-run="wip">BM25 Conflicts</th>'
-    '<th class="dbg-col wip-col" data-run="wip">BM25 Match</th>'
+    '<th class="chunks-col wip-col" data-run="wip">BM25 Chunks</th>'
 )
 
 run_score_sums = [0.0] * RUN_COLS
 run_score_counts = [0] * RUN_COLS
 
-# WIP projected score: use wip score for tested questions, last run score for rest
 last_run_questions = runs[-1]["questions"] if runs else {}
 wip_total_weight = 0.0
 wip_weighted_score = 0.0
@@ -120,11 +117,11 @@ for row_num, qid in enumerate(all_ids, 1):
     meta = eval_meta.get(qid, {})
     question = esc(meta.get("question", qid))
     expected = esc(meta.get("expected_answer", ""))
+    category = esc(meta.get("category", ""))
 
     must_include = meta.get("must_include") or []
     must_text = ", ".join(esc(str(m)) for m in must_include)
 
-    # collect snapshot ids from first run that has this question
     snap_ids_text = ""
     for run in runs:
         row = run["questions"].get(qid)
@@ -140,6 +137,7 @@ for row_num, qid in enumerate(all_ids, 1):
         f'<td class="num-col">{row_num}</td>'
         f'<td class="snap-col">{esc(snap_ids_text)}</td>'
         f'<td class="wt-col">{weight}</td>'
+        f'<td class="cat-col">{category}</td>'
         f'<td class="q-col">{question}</td>'
         f'<td class="exp-col">{expected}</td>'
         f'<td class="must-col">{must_text}</td>'
@@ -149,67 +147,94 @@ for row_num, qid in enumerate(all_ids, 1):
     for i, run in enumerate(runs):
         row = run["questions"].get(qid)
         if row is None:
-            td_runs += f'<td class="run-col" data-run="{i}">—</td><td class="score-col" data-run="{i}">—</td>'
+            td_runs += (
+                f'<td class="run-col" data-run="{i}">—</td>'
+                f'<td class="score-col" data-run="{i}">—</td>'
+                f'<td class="judge-col" data-run="{i}">—</td>'
+            )
             continue
         ans = row.get("answer") or {}
-        atext = esc((ans.get("text") or "")[:300])
+        atext = esc(ans.get("text") or "")
         sc = row.get("score")
         sc_str = f"{sc:.2f}" if sc is not None else "—"
         if sc is not None:
             run_score_sums[i] += sc
             run_score_counts[i] += 1
 
+        # Judge info: matched, missed, trap_hits, latency
+        matched = row.get("matched") or []
+        missed = row.get("missed") or []
+        traps = row.get("trap_hits") or []
+        lat = row.get("latency_s")
+        lat_str = f"{lat:.1f}s" if lat is not None else ""
+        judge_parts = []
+        if matched:
+            judge_parts.append(f'<span class="jok">✓ {esc(", ".join(str(m) for m in matched))}</span>')
+        if missed:
+            judge_parts.append(f'<span class="jmiss">✗ {esc(", ".join(str(m) for m in missed))}</span>')
+        if traps:
+            judge_parts.append(f'<span class="jtrap">⚠ trap: {esc(", ".join(str(t) for t in traps))}</span>')
+        if lat_str:
+            judge_parts.append(f'<span class="jlat">{lat_str}</span>')
+        judge_html = "<br>".join(judge_parts) if judge_parts else "—"
+
         td_runs += (
             f'<td class="run-col ans-col" data-run="{i}">'
             f'<div class="ans-text">{atext}</div>'
             f'</td>'
             f'<td class="score-col" data-run="{i}">{sc_str}</td>'
+            f'<td class="judge-col" data-run="{i}">{judge_html}</td>'
         )
 
-    # WIP column — always rendered (5 cells)
+    # WIP column
     if qid in wip_questions:
         wrow = wip_questions[qid]
         wans = wrow.get("answer") or {}
-        watext = esc((wans.get("text") or "")[:300])
+        watext = esc(wans.get("text") or "")
         wsc = wrow.get("score")
         wsc_str = f"{wsc:.2f}" if wsc is not None else "?"
         wip_src = "wip"
-        chunks = wrow.get("chunks") or [] if wsc == 0.0 else []
+        chunks = wrow.get("chunks") or []
         chunk_parts = []
         for ci, c in enumerate(chunks, 1):
             path = (c.get("url") or "").replace("https://www.dupaco.com", "")
             snippet = esc(c.get("text") or "")
+            auth = c.get("authority", "")
             chunk_parts.append(
-                f'<div class="dbg-chunk"><b>{ci}. {esc(c.get("snapshot_id",""))} {path}</b>'
-                f'<pre class="dbg-pre">{snippet}</pre></div>'
+                f'<div class="chunk-item"><b>{ci}. [{auth}] {esc(path)}</b>'
+                f'<pre class="chunk-pre">{snippet}</pre></div>'
             )
-        chunks_html = "".join(chunk_parts)
+        chunks_inner = "".join(chunk_parts)
+        if chunks_inner:
+            chunks_html = (
+                f'<details class="chunk-toggle">'
+                f'<summary>{len(chunks)} chunk(s)</summary>'
+                f'<div class="chunk-body">{chunks_inner}</div>'
+                f'</details>'
+            )
+        else:
+            chunks_html = ""
     else:
-        # fall back to last run
         lrow = last_run_questions.get(qid) or {}
         lans = lrow.get("answer") or {}
-        watext = esc((lans.get("text") or "")[:300])
+        watext = esc(lans.get("text") or "")
         wsc = lrow.get("score")
         wsc_str = f"{wsc:.2f}" if wsc is not None else "—"
         wip_src = "last"
         chunks_html = ""
 
-    # accumulate projected score
     if wsc is not None:
         wip_total_weight += weight
         wip_weighted_score += wsc * weight
 
     is_zero = wip_src == "wip" and wsc == 0.0
     highlight = ' style="background:#fee2e2"' if is_zero else ""
-    wip_score_style = highlight
     td_wip = (
         f'<td class="run-col wip-col ans-col" data-run="wip"{highlight}>'
         f'<div class="ans-text">{watext}</div>'
         f'</td>'
-        f'<td class="score-col wip-col" data-run="wip"{wip_score_style}>{wsc_str}</td>'
-        f'<td class="dbg-col dbg-chunks wip-col" data-run="wip">{chunks_html}</td>'
-        f'<td class="dbg-col wip-col" data-run="wip"></td>'
-        f'<td class="dbg-col wip-col" data-run="wip"></td>'
+        f'<td class="score-col wip-col" data-run="wip"{highlight}>{wsc_str}</td>'
+        f'<td class="chunks-col wip-col" data-run="wip">{chunks_html}</td>'
     )
 
     rows_html += f'<tr>{td_meta}{td_runs}{td_wip}</tr>\n'
@@ -225,22 +250,17 @@ for i, run in enumerate(runs):
     qs_str = f"{qs:.4f}" if qs is not None else "—"
     fs_str = f"{fs:.4f}" if fs is not None else "—"
     avg_cells += (
-        f'<td class="run-col avg-cell" data-run="{i}">'
-        f'<span style="font-size:0.78rem">debug_qa: {qs_str} &nbsp; final: {fs_str}</span>'
+        f'<td class="run-col avg-cell" data-run="{i}" colspan="3">'
+        f'<span style="font-size:0.78rem">qa: {qs_str} &nbsp; final: {fs_str}</span>'
         f'</td>'
-        f'<td class="score-col avg-cell" data-run="{i}"></td>'
     )
 
 proj_str = f"{wip_proj:.4f}" if wip_proj is not None else "—"
 wip_avg_cell = (
-    f'<td class="run-col wip-col avg-cell" data-run="wip" style="background:#fffbe6">'
-    f'<span style="font-size:0.78rem">est. debug_qa: {proj_str} '
+    f'<td class="run-col wip-col avg-cell" data-run="wip" style="background:#fffbe6" colspan="3">'
+    f'<span style="font-size:0.78rem">est. qa: {proj_str} '
     f'&nbsp; ({wip_tested_count}/{len(all_ids)} tested)</span>'
     f'</td>'
-    f'<td class="score-col wip-col avg-cell" data-run="wip" style="background:#fffbe6"></td>'
-    f'<td class="dbg-col wip-col avg-cell" data-run="wip"></td>'
-    f'<td class="dbg-col wip-col avg-cell" data-run="wip"></td>'
-    f'<td class="dbg-col wip-col avg-cell" data-run="wip"></td>'
 )
 
 rows_html += (
@@ -248,6 +268,7 @@ rows_html += (
     f'<td class="num-col avg-cell"></td>'
     f'<td class="snap-col avg-cell"></td>'
     f'<td class="wt-col avg-cell"></td>'
+    f'<td class="cat-col avg-cell"></td>'
     f'<td class="q-col avg-cell" colspan="3">Summary (from report.json)</td>'
     f'{avg_cells}{wip_avg_cell}'
     f'</tr>\n'
@@ -286,13 +307,15 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 .num-col {{ min-width: 32px; max-width: 36px; text-align: center; color: var(--muted); font-size: 0.78rem; }}
 .snap-col {{ min-width: 90px; max-width: 120px; font-size: 0.78rem; color: var(--muted); font-family: monospace; }}
 .wt-col {{ min-width: 32px; max-width: 42px; text-align: center; font-size: 0.78rem; color: var(--muted); }}
-.q-col {{ min-width: 165px; max-width: 210px; font-size: 0.78rem; color: var(--muted); }}
-.exp-col {{ min-width: 135px; max-width: 195px; font-size: 0.78rem; color: var(--muted); }}
+.cat-col {{ min-width: 110px; max-width: 150px; font-size: 0.72rem; color: var(--muted); }}
+.q-col {{ min-width: 165px; max-width: 220px; font-size: 0.78rem; }}
+.exp-col {{ min-width: 135px; max-width: 200px; font-size: 0.78rem; color: var(--muted); }}
 .must-col {{ min-width: 100px; max-width: 160px; font-size: 0.78rem; color: var(--muted); }}
-.run-col {{ min-width: 260px; max-width: 340px; font-size: 0.78rem; color: var(--muted); }}
-.score-col {{ min-width: 56px; max-width: 56px; text-align: center; font-size: 0.78rem; color: var(--muted); }}
-.ans-col {{ font-size: 0.78rem; color: var(--muted); }}
-.ans-text {{ max-height: 80px; overflow: hidden; line-height: 1.45; }}
+.run-col {{ min-width: 280px; max-width: 400px; font-size: 0.78rem; }}
+.score-col {{ min-width: 52px; max-width: 52px; text-align: center; font-size: 0.78rem; color: var(--muted); }}
+.judge-col {{ min-width: 160px; max-width: 220px; font-size: 0.72rem; vertical-align: top; }}
+.ans-col {{ font-size: 0.78rem; }}
+.ans-text {{ line-height: 1.5; white-space: pre-wrap; word-break: break-word; }}
 .avg-row td {{ border-top: 2px solid var(--border); font-size: 0.85rem; }}
 .avg-cell {{ background: var(--code-bg); }}
 .run-filter {{ display:flex; flex-wrap:wrap; gap:6px; align-items:center; margin-bottom:10px; }}
@@ -307,10 +330,16 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 .run-cb-label input {{ margin:0; cursor:pointer; }}
 [data-hidden] {{ display:none; }}
 .wip-col {{ border-left: 2px solid #f59e0b !important; }}
-.dbg-col {{ min-width: 180px; max-width: 280px; font-size: 0.72rem; color: var(--muted); vertical-align: top; }}
-.dbg-chunks {{ min-width: 540px; max-width: 840px; }}
-.dbg-chunk {{ margin-bottom: 6px; }}
-.dbg-pre {{ white-space: pre-wrap; word-break: break-word; font-size: 0.68rem; margin: 2px 0 0; max-height: 80px; overflow: hidden; }}
+.chunks-col {{ min-width: 220px; max-width: 500px; font-size: 0.72rem; color: var(--muted); vertical-align: top; }}
+.chunk-toggle summary {{ cursor:pointer; font-size:0.72rem; color:var(--muted); padding:2px 0; }}
+.chunk-toggle summary:hover {{ color:var(--fg); }}
+.chunk-body {{ margin-top:4px; }}
+.chunk-item {{ margin-bottom: 8px; border-left: 2px solid var(--border); padding-left: 6px; }}
+.chunk-pre {{ white-space: pre-wrap; word-break: break-word; font-size: 0.68rem; margin: 2px 0 0; line-height: 1.4; }}
+.jok {{ color: #16a34a; display:block; font-size:0.72rem; }}
+.jmiss {{ color: #dc2626; display:block; font-size:0.72rem; }}
+.jtrap {{ color: #d97706; display:block; font-size:0.72rem; }}
+.jlat {{ color: var(--muted); display:block; font-size:0.70rem; margin-top:2px; }}
 </style>
 </head>
 <body>
@@ -329,6 +358,7 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
     <th class="num-col" id="num-th" onclick="sortByNum()" style="cursor:pointer" title="Sort by row number">#</th>
     <th class="snap-col">snapshot</th>
     <th class="wt-col" id="wt-th" onclick="sortByWt()" style="cursor:pointer" title="Sort by weight">wt</th>
+    <th class="cat-col">category</th>
     <th>Question</th>
     <th>Expected Answer</th>
     <th class="must-col">must_include</th>
@@ -396,13 +426,13 @@ function _sortTable(colClass, asc) {{
 function sortByWt() {{
   _wtAsc = _wtAsc === true ? false : true; _numAsc = null;
   _sortTable('wt-col', _wtAsc);
-  document.getElementById('wt-th').textContent = 'wt ' + (_wtAsc ? '▲' : '▼');
+  document.getElementById('wt-th').textContent = 'wt ' + (_wtAsc ? '▲' : '▼');
   document.getElementById('num-th').textContent = '#';
 }}
 function sortByNum() {{
   _numAsc = _numAsc === true ? false : true; _wtAsc = null;
   _sortTable('num-col', _numAsc);
-  document.getElementById('num-th').textContent = '# ' + (_numAsc ? '▲' : '▼');
+  document.getElementById('num-th').textContent = '# ' + (_numAsc ? '▲' : '▼');
   document.getElementById('wt-th').textContent = 'wt';
 }}
 </script>

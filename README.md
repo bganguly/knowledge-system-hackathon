@@ -6,6 +6,14 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ---
 
+## Eval run comparison
+
+Per-question drill-down across all 19 runs (answer · score · judge · BM25 chunks):
+**[comparison report](https://claude.ai/artifact/JgfuQECziuJbVYfsPmMQY6)**
+_(private link — share via the artifact's Share menu to make public)_
+
+---
+
 ## Approaches considered and skipped
 
 | Approach | Reason skipped |
