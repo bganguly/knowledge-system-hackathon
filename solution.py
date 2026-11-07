@@ -6,6 +6,7 @@ Requires ANTHROPIC_API_KEY in the environment.
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import os
 import pickle
@@ -147,8 +148,8 @@ class _Chunk:
 class KnowledgeSystem:
     def __init__(self):
         self._client       = anthropic.Anthropic()
-        self._snapshots: list[tuple[str, str]] = []   # (taken_on, snapshot_id)
-        self._all_chunks: list[_Chunk]         = []
+        self._snapshot_dates: dict[str, datetime.date] = {}   # snapshot_id → date
+        self._chunks_by_snapshot: dict[str, list[_Chunk]] = {}  # snapshot_id → chunks
         self._page_history: dict[str, list[tuple[str, str, str]]] = {}
         self._conflicts: list[Conflict]        = []
         self._answer_count                     = 0
@@ -163,7 +164,8 @@ class KnowledgeSystem:
     # ------------------------------------------------------------------
 
     def ingest(self, snapshot: Snapshot) -> None:
-        self._snapshots.append((snapshot.taken_on, snapshot.snapshot_id))
+        self._snapshot_dates[snapshot.snapshot_id] = datetime.date.fromisoformat(snapshot.taken_on)
+        snap_chunks = self._chunks_by_snapshot.setdefault(snapshot.snapshot_id, [])
 
         for page in snapshot.pages:
             hist = self._page_history.setdefault(page.url, [])
@@ -180,7 +182,7 @@ class KnowledgeSystem:
                 for sub in subs:
                     if len(sub) >= _MIN_CHUNK and sub not in seen_in_page:
                         seen_in_page.add(sub)
-                        self._all_chunks.append(_Chunk(
+                        snap_chunks.append(_Chunk(
                             url=page.url,
                             title=page.title,
                             snapshot_id=snapshot.snapshot_id,
@@ -204,8 +206,7 @@ class KnowledgeSystem:
 
         texts = [
             c.title + " " + c.text
-            for c in self._all_chunks
-            if c.snapshot_id == snapshot_id
+            for c in self._chunks_by_snapshot.get(snapshot_id, [])
         ]
         if not texts:
             return
@@ -215,6 +216,8 @@ class KnowledgeSystem:
             with open(cache_path, "rb") as f:
                 stored: dict = pickle.load(f)
             self._embed_cache.update(stored)
+            if self._st_model is None:
+                self._st_model = SentenceTransformer(_DENSE_MODEL)
             print(f"[embed] {snapshot_id}: loaded {len(stored)} vectors from disk cache",
                   flush=True)
             return
@@ -406,18 +409,19 @@ class KnowledgeSystem:
     # ------------------------------------------------------------------
 
     def _chunks_as_of(self, as_of: Optional[str]) -> list[_Chunk]:
-        if not self._snapshots:
-            return self._all_chunks
+        if not self._snapshot_dates:
+            return []
 
         if as_of is None:
-            target = max(s[0] for s in self._snapshots)
+            winner_id = max(self._snapshot_dates, key=self._snapshot_dates.__getitem__)
         else:
-            eligible = [s for s in self._snapshots if s[0] <= as_of]
+            target_date = datetime.date.fromisoformat(as_of)
+            eligible = {sid: d for sid, d in self._snapshot_dates.items() if d <= target_date}
             if not eligible:
                 return []
-            target = max(s[0] for s in eligible)
+            winner_id = max(eligible, key=eligible.__getitem__)
 
-        return [c for c in self._all_chunks if c.taken_on == target]
+        return self._chunks_by_snapshot.get(winner_id, [])
 
     def _retrieve(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
         if not pool:

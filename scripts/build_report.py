@@ -110,6 +110,8 @@ last_run_questions = runs[-1]["questions"] if runs else {}
 wip_total_weight = 0.0
 wip_weighted_score = 0.0
 
+FLAGGED_ROWS = {10, 11, 13, 22, 23, 26, 31, 33, 34, 38}
+
 rows_html = ""
 for row_num, qid in enumerate(all_ids, 1):
     meta = eval_meta.get(qid, {})
@@ -186,11 +188,12 @@ for row_num, qid in enumerate(all_ids, 1):
             wip_weighted_score += wsc * weight
 
         highlight = ' style="background:#fffbe6"' if wip_src == "wip" else ""
+        wip_score_style = ' style="background:#fee2e2"' if row_num in FLAGGED_ROWS else (highlight if highlight else "")
         td_wip = (
             f'<td class="run-col wip-col ans-col" data-run="wip"{highlight}>'
             f'<div class="ans-text">{watext}</div>'
             f'</td>'
-            f'<td class="score-col wip-col" data-run="wip"{highlight}>{wsc_str}</td>'
+            f'<td class="score-col wip-col" data-run="wip"{wip_score_style}>{wsc_str}</td>'
         )
 
     rows_html += f'<tr>{td_meta}{td_runs}{td_wip}</tr>\n'

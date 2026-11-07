@@ -18,7 +18,9 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SNAP_DIR = REPO / "snapshots"
 EVAL_FILE = REPO.parent / "hackathon-knowledge-kit-participant" / "eval" / "public_eval.jsonl"
-WIP_FILE = REPO / "results" / "wip.jsonl"
+
+_MODE = os.environ.get("RETRIEVAL_MODE", "bm25")
+WIP_FILE = REPO / "results" / f"wip_{_MODE}.jsonl"
 
 # ---------------------------------------------------------------------------
 # Load eval metadata and row-to-id mapping
@@ -130,7 +132,7 @@ def main():
     if "--clear-all" in args:
         if WIP_FILE.exists():
             WIP_FILE.unlink()
-        print("Cleared wip.jsonl")
+        print(f"Cleared {WIP_FILE.name}")
         return
 
     if not args:
@@ -196,7 +198,7 @@ def main():
         },
     }
     _write_wip(wip)
-    print(f"\nSaved to wip.jsonl  ({len(wip)} question(s) tracked)")
+    print(f"\nSaved to {WIP_FILE.name}  ({len(wip)} question(s) tracked, mode={_MODE})")
 
 if __name__ == "__main__":
     main()
