@@ -6,6 +6,17 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ---
 
+## Approaches considered and skipped
+
+| Approach | Reason skipped |
+|---|---|
+| Dense / hybrid retrieval (sentence-transformers) | Tried (Phase 5). Re-ranker demotes rate-table chunks in favour of blog/calculator content; row 2 BM25=1 → hybrid=0. Reverted. |
+| Markdown heading splits, tables kept intact | Credit union pages are HTML→text; heading structure unreliable. Table-row chunks outperform whole-table chunks for rate queries — keeping tables intact would hurt `tier_disambiguation`. |
+| Adjacent chunk retrieval | Noted as useful for `branch_info` (address + hours often in adjacent paragraphs). Not implemented; isolated enough to add later without touching main chunking. |
+| Opus model | Sonnet p95 already 4.38s vs haiku's ~2.5s, costing speed-pillar points. Opus latency would be worse; unless accuracy improves to ~0.75+, net final_score is lower than haiku. |
+
+---
+
 ## Eval run log
 
 | | 2026-11-05 22:52:16 | 2026-11-06 22:31:25 | 2026-11-06 22:49:34 | 2026-11-06 22:59:32 |
