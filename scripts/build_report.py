@@ -74,7 +74,7 @@ def esc(s: str) -> str:
     return (s or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 RUN_COLS = len(runs)
-HAS_WIP = bool(wip_questions)
+HAS_WIP = True
 
 header_cells = ""
 run_labels = []
@@ -92,18 +92,18 @@ for ri, run in enumerate(runs):
     )
     run_labels.append(f"{run['ts']} ({fs_str})")
 
-# WIP header (always last column)
-if HAS_WIP:
-    _wip_latest = max((r.get("ts", "") for r in wip_questions.values()), default="")
-    wip_header = (
-        '<th class="run-col wip-col" data-run="wip">'
-        f'<div class="run-ts">WIP &nbsp;<span style="font-weight:400">({len(wip_questions)} tested)</span></div>'
-        f'<div class="run-fs">est. token-check · last update: {esc(_wip_latest)}</div>'
-        '</th>'
-        '<th class="score-col wip-col" data-run="wip">est.</th>'
-    )
-else:
-    wip_header = ""
+# WIP header — always rendered (5 columns: answer, score, chunks, conflicts, match)
+_wip_latest = max((r.get("ts", "") for r in wip_questions.values()), default="") if wip_questions else ""
+wip_header = (
+    '<th class="run-col wip-col" data-run="wip">'
+    f'<div class="run-ts">WIP &nbsp;<span style="font-weight:400">({len(wip_questions)} tested)</span></div>'
+    f'<div class="run-fs">est. token-check · last update: {esc(_wip_latest)}</div>'
+    '</th>'
+    '<th class="score-col wip-col" data-run="wip">est.</th>'
+    '<th class="dbg-col wip-col" data-run="wip">BM25 Chunks</th>'
+    '<th class="dbg-col wip-col" data-run="wip">BM25 Conflicts</th>'
+    '<th class="dbg-col wip-col" data-run="wip">BM25 Match</th>'
+)
 
 run_score_sums = [0.0] * RUN_COLS
 run_score_counts = [0] * RUN_COLS
@@ -166,38 +166,50 @@ for row_num, qid in enumerate(all_ids, 1):
             f'<td class="score-col" data-run="{i}">{sc_str}</td>'
         )
 
-    # WIP column
-    td_wip = ""
-    if HAS_WIP:
-        if qid in wip_questions:
-            wrow = wip_questions[qid]
-            wans = wrow.get("answer") or {}
-            watext = esc((wans.get("text") or "")[:300])
-            wsc = wrow.get("score")
-            wsc_str = f"{wsc:.2f}" if wsc is not None else "?"
-            wip_src = "wip"
-        else:
-            # fall back to last run
-            lrow = last_run_questions.get(qid) or {}
-            lans = lrow.get("answer") or {}
-            watext = esc((lans.get("text") or "")[:300])
-            wsc = lrow.get("score")
-            wsc_str = f"{wsc:.2f}" if wsc is not None else "—"
-            wip_src = "last"
+    # WIP column — always rendered (5 cells)
+    if qid in wip_questions:
+        wrow = wip_questions[qid]
+        wans = wrow.get("answer") or {}
+        watext = esc((wans.get("text") or "")[:300])
+        wsc = wrow.get("score")
+        wsc_str = f"{wsc:.2f}" if wsc is not None else "?"
+        wip_src = "wip"
+        chunks = wrow.get("chunks") or []
+        chunk_parts = []
+        for ci, c in enumerate(chunks, 1):
+            path = (c.get("url") or "").replace("https://www.dupaco.com", "")
+            snippet = esc(c.get("text") or "")
+            chunk_parts.append(
+                f'<div class="dbg-chunk"><b>{ci}. {esc(c.get("snapshot_id",""))} {path}</b>'
+                f'<pre class="dbg-pre">{snippet}</pre></div>'
+            )
+        chunks_html = "".join(chunk_parts)
+    else:
+        # fall back to last run
+        lrow = last_run_questions.get(qid) or {}
+        lans = lrow.get("answer") or {}
+        watext = esc((lans.get("text") or "")[:300])
+        wsc = lrow.get("score")
+        wsc_str = f"{wsc:.2f}" if wsc is not None else "—"
+        wip_src = "last"
+        chunks_html = ""
 
-        # accumulate projected score
-        if wsc is not None:
-            wip_total_weight += weight
-            wip_weighted_score += wsc * weight
+    # accumulate projected score
+    if wsc is not None:
+        wip_total_weight += weight
+        wip_weighted_score += wsc * weight
 
-        highlight = ' style="background:#fffbe6"' if wip_src == "wip" else ""
-        wip_score_style = ' style="background:#fee2e2"' if row_num in FLAGGED_ROWS else (highlight if highlight else "")
-        td_wip = (
-            f'<td class="run-col wip-col ans-col" data-run="wip"{highlight}>'
-            f'<div class="ans-text">{watext}</div>'
-            f'</td>'
-            f'<td class="score-col wip-col" data-run="wip"{wip_score_style}>{wsc_str}</td>'
-        )
+    highlight = ' style="background:#fffbe6"' if wip_src == "wip" else ""
+    wip_score_style = ' style="background:#fee2e2"' if row_num in FLAGGED_ROWS else (highlight if highlight else "")
+    td_wip = (
+        f'<td class="run-col wip-col ans-col" data-run="wip"{highlight}>'
+        f'<div class="ans-text">{watext}</div>'
+        f'</td>'
+        f'<td class="score-col wip-col" data-run="wip"{wip_score_style}>{wsc_str}</td>'
+        f'<td class="dbg-col dbg-chunks wip-col" data-run="wip">{chunks_html}</td>'
+        f'<td class="dbg-col wip-col" data-run="wip"></td>'
+        f'<td class="dbg-col wip-col" data-run="wip"></td>'
+    )
 
     rows_html += f'<tr>{td_meta}{td_runs}{td_wip}</tr>\n'
 
@@ -218,16 +230,17 @@ for i, run in enumerate(runs):
         f'<td class="score-col avg-cell" data-run="{i}"></td>'
     )
 
-wip_avg_cell = ""
-if HAS_WIP:
-    proj_str = f"{wip_proj:.4f}" if wip_proj is not None else "—"
-    wip_avg_cell = (
-        f'<td class="run-col wip-col avg-cell" data-run="wip" style="background:#fffbe6">'
-        f'<span style="font-size:0.78rem">est. debug_qa: {proj_str} '
-        f'&nbsp; ({wip_tested_count}/{len(all_ids)} tested)</span>'
-        f'</td>'
-        f'<td class="score-col wip-col avg-cell" data-run="wip" style="background:#fffbe6"></td>'
-    )
+proj_str = f"{wip_proj:.4f}" if wip_proj is not None else "—"
+wip_avg_cell = (
+    f'<td class="run-col wip-col avg-cell" data-run="wip" style="background:#fffbe6">'
+    f'<span style="font-size:0.78rem">est. debug_qa: {proj_str} '
+    f'&nbsp; ({wip_tested_count}/{len(all_ids)} tested)</span>'
+    f'</td>'
+    f'<td class="score-col wip-col avg-cell" data-run="wip" style="background:#fffbe6"></td>'
+    f'<td class="dbg-col wip-col avg-cell" data-run="wip"></td>'
+    f'<td class="dbg-col wip-col avg-cell" data-run="wip"></td>'
+    f'<td class="dbg-col wip-col avg-cell" data-run="wip"></td>'
+)
 
 rows_html += (
     f'<tr class="avg-row">'
@@ -293,6 +306,9 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 .run-cb-label input {{ margin:0; cursor:pointer; }}
 [data-hidden] {{ display:none; }}
 .wip-col {{ border-left: 2px solid #f59e0b !important; }}
+.dbg-col {{ min-width: 180px; max-width: 280px; font-size: 0.72rem; color: var(--muted); vertical-align: top; }}
+.dbg-chunk {{ margin-bottom: 6px; }}
+.dbg-pre {{ white-space: pre-wrap; word-break: break-word; font-size: 0.68rem; margin: 2px 0 0; max-height: 80px; overflow: hidden; }}
 </style>
 </head>
 <body>
