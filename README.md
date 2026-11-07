@@ -15,10 +15,10 @@ Conflict detection compares percentage values across snapshot dates for the same
 | max_per_url | 6 | 6 |
 | max_chunk | 700 | 700 |
 | min_chunk | 20 | 20 |
-| score (final) | **0.6812** | **0.6605** |
 | pass | 28 | 27 |
 | fail | 10 | 11 |
 | partial pass | 2 | 2 |
+| final_score | **0.6812** | **0.6605** |
 
 Same committed code, different runs — spread of ~0.05 reflects LLM non-determinism.
 
