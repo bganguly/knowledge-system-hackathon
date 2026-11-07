@@ -26,6 +26,19 @@ from pathlib import Path
 os.environ.setdefault("ANTHROPIC_API_KEY", "chunk-runner-no-llm")
 
 REPO_DIR = Path(__file__).resolve().parent.parent
+
+# solution.py runs _add_harness_to_path() at import time; it needs
+# harness/contract.py on sys.path BEFORE we import it.  Parse --kit
+# from argv early so we can add the harness directory first.
+_DEFAULT_KIT = REPO_DIR.parent / "hackathon-knowledge-kit-participant"
+_kit_arg = None
+for _i, _a in enumerate(sys.argv):
+    if _a == "--kit" and _i + 1 < len(sys.argv):
+        _kit_arg = Path(sys.argv[_i + 1])
+        break
+_kit_early = _kit_arg if _kit_arg else _DEFAULT_KIT
+sys.path.insert(0, str(_kit_early / "harness"))
+
 sys.path.insert(0, str(REPO_DIR))
 
 import solution  # noqa: E402  (must come after path setup)

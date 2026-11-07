@@ -7,7 +7,7 @@ VENV="$REPO_DIR/.venv"
 PY312="/usr/local/bin/python3.12"
 
 DEFAULT_KIT="$(cd "$REPO_DIR/../hackathon-knowledge-kit-participant" && pwd 2>/dev/null || echo "")"
-DEFAULT_EVAL="$REPO_DIR/eval/public_eval.jsonl"
+DEFAULT_EVAL="$DEFAULT_KIT/eval/public_eval.jsonl"
 
 usage() {
   cat <<EOF
