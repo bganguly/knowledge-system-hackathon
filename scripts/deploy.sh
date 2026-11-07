@@ -9,7 +9,7 @@ POSITIONAL=()
 
 usage() {
   cat <<EOF
-Usage: $0 [--retrieve bm25|dense|hybrid|bm25,hybrid] [<row_number> | --clear | --clear-all | --eval]
+Usage: $0 [--retrieve bm25|dense|hybrid|bm25,hybrid] [<row_number> | --clear | --clear-all | --eval | --custom-eval]
 
   --retrieve    Retrieval strategy (default: bm25); comma-separate to run multiple
                   bm25         - keyword BM25 (fast, default)
@@ -21,12 +21,14 @@ Usage: $0 [--retrieve bm25|dense|hybrid|bm25,hybrid] [<row_number> | --clear | -
   --clear       Remove a row from wip_<mode>.jsonl (requires <row_number> before it)
   --clear-all   Wipe wip_<mode>.jsonl entirely
   --eval        Run the full harness eval (slow, hits the LLM for all 40 rows)
+  --custom-eval Run the full harness eval with 40 public + 5 custom questions (45 total)
 
 Examples:
   ./scripts/deploy.sh 10
   ./scripts/deploy.sh --retrieve hybrid 10
   ./scripts/deploy.sh --retrieve bm25,hybrid 2
   ./scripts/deploy.sh --retrieve dense --eval
+  ./scripts/deploy.sh --custom-eval
 EOF
 }
 
@@ -99,9 +101,7 @@ echo "==> Ensuring snapshots are extracted"
 _ensure_snapshots
 
 # ── Dispatch ──────────────────────────────────────────────────────────────────
-if [[ "${POSITIONAL[0]:-}" == "--eval" ]]; then
-  RETRIEVAL_MODE="${MODES[0]}"
-  export RETRIEVAL_MODE
+_select_model() {
   DEFAULT_MODEL="${LLM_MODEL:-claude-haiku-5-5}"
   read -r -p "Switch model? (current: $DEFAULT_MODEL) [y/N] " _switch
   _switch="${_switch:-N}"
@@ -121,6 +121,12 @@ if [[ "${POSITIONAL[0]:-}" == "--eval" ]]; then
   else
     export LLM_MODEL="$DEFAULT_MODEL"
   fi
+}
+
+if [[ "${POSITIONAL[0]:-}" == "--eval" ]]; then
+  RETRIEVAL_MODE="${MODES[0]}"
+  export RETRIEVAL_MODE
+  _select_model
   echo "==> Running full harness eval (RETRIEVAL_MODE=$RETRIEVAL_MODE, model=$LLM_MODEL)"
   RESULTS_DIR="$REPO_DIR/results"
   mkdir -p "$RESULTS_DIR"
@@ -137,6 +143,56 @@ if [[ "${POSITIONAL[0]:-}" == "--eval" ]]; then
   cp "$RESULTS_DIR/per_question.jsonl" "$RUNS_DIR/run_${RUN_TS}.jsonl" 2>/dev/null || true
   cp "$RESULTS_DIR/report.json"        "$RUNS_DIR/report_${RUN_TS}.json" 2>/dev/null || true
   echo "==> Run archived to $RUNS_DIR/run_${RUN_TS}.jsonl"
+  echo "==> Rebuilding comparison report"
+  "$PY" "$REPO_DIR/scripts/build_report.py"
+  echo "==> Done — results/comparison.html updated"
+elif [[ "${POSITIONAL[0]:-}" == "--custom-eval" ]]; then
+  RETRIEVAL_MODE="${MODES[0]}"
+  export RETRIEVAL_MODE
+  _select_model
+  CUSTOM_EVAL="$REPO_DIR/eval/custom_eval.jsonl"
+  if [[ ! -f "$CUSTOM_EVAL" ]]; then
+    echo "ERROR: $CUSTOM_EVAL not found" >&2; exit 1
+  fi
+  COMBINED_EVAL="$REPO_DIR/results/.combined_eval_$$.jsonl"
+  mkdir -p "$REPO_DIR/results"
+  cat "$KIT_DIR/eval/public_eval.jsonl" "$CUSTOM_EVAL" > "$COMBINED_EVAL"
+  trap 'rm -f "$COMBINED_EVAL"' EXIT
+  echo "==> Running 45-question eval (40 public + 5 custom; RETRIEVAL_MODE=$RETRIEVAL_MODE, model=$LLM_MODEL)"
+  RESULTS_DIR="$REPO_DIR/results"
+  "$PY" "$KIT_DIR/harness/run_eval.py" \
+    --submission "$REPO_DIR" \
+    --eval "$COMBINED_EVAL" \
+    --snapshots "$REPO_DIR/snapshots" \
+    --out "$RESULTS_DIR"
+  echo ""
+  echo "==> Results written to $RESULTS_DIR"
+  RUNS_DIR="$RESULTS_DIR/runs"
+  mkdir -p "$RUNS_DIR"
+  RUN_TS="$(date '+%Y-%m-%d_%H-%M-%S')"
+  cp "$RESULTS_DIR/per_question.jsonl" "$RUNS_DIR/run_${RUN_TS}_custom.jsonl" 2>/dev/null || true
+  cp "$RESULTS_DIR/report.json"        "$RUNS_DIR/report_${RUN_TS}_custom.json" 2>/dev/null || true
+  echo "==> Run archived to $RUNS_DIR/run_${RUN_TS}_custom.jsonl"
+  echo ""
+  echo "==> Custom question breakdown (cust-*):"
+  "$PY" -c "
+import json
+rows = []
+with open('$RESULTS_DIR/per_question.jsonl') as f:
+    for line in f:
+        line = line.strip()
+        if line:
+            rows.append(json.loads(line))
+custom = [r for r in rows if r.get('id','').startswith('cust-')]
+if not custom:
+    print('  No custom questions found')
+else:
+    for r in custom:
+        verdict = 'PASS' if r.get('score',0) >= 1.0 else ('PARTIAL' if r.get('score',0) > 0 else 'FAIL')
+        print(f'  {r[\"id\"]} ({r.get(\"category\",\"?\")}): score={r.get(\"score\",\"?\"):.2f}  [{verdict}]')
+    scores = [r.get('score',0) for r in custom]
+    print(f'  --- custom avg: {sum(scores)/len(scores):.4f} over {len(custom)} questions')
+"
   echo "==> Rebuilding comparison report"
   "$PY" "$REPO_DIR/scripts/build_report.py"
   echo "==> Done — results/comparison.html updated"

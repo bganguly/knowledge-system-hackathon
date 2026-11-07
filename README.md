@@ -45,6 +45,35 @@ Adjacent chunk retrieval (top-3 results get neighbors from same URL) lifted `bra
 
 ---
 
+## Custom eval (5 questions · 2026-11-06)
+
+5 questions written against facts verifiable in the snapshot markdown files, appended to the 40 public questions for a 45-question combined run.
+
+**Run summary (45 questions, haiku, adjacent chunks)**
+
+| | 40 public (baseline) | 45 combined |
+|---|---|---|
+| questions | 40 | 45 |
+| qa_score | 0.7283 | 0.7068 |
+| p95 latency | 2.42s | 2.57s |
+| final_score | **0.7157** | **0.6920** |
+
+The slight drop in final_score reflects two custom question misses dragging down entity_attribution and temporal_as_of category averages, plus marginally slower p95 from 5 extra LLM calls.
+
+**Per custom question**
+
+| id | category | score | verdict | note |
+|---|---|---|---|---|
+| cust-001 | entity_attribution | 0.50 | PARTIAL | Found "1948"; missed "10" — founding count is in a newsroom press release, not the main about page |
+| cust-002 | current_value | 1.00 | PASS | "$1,500 AD&D insurance, ages 18–85" retrieved correctly from about/join |
+| cust-003 | current_value | 1.00 | PASS | "$25 minimum deposit" retrieved correctly from about/join |
+| cust-004 | entity_attribution | 0.00 | FAIL | "I don't know" — "Holiday Club created 1954" is only in a newsroom article; not retrieved |
+| cust-005 | temporal_as_of | 1.00 | PASS | Launchpad Savings 3.25% APY (as_of 2026-09-28) retrieved correctly from latest snapshot |
+
+**Analysis:** cust-001 and cust-004 both fail on facts buried in newsroom/press-release pages rather than product or about pages. The BM25 corpus covers them (the pages are scraped), but authority scoring de-prioritizes newsroom URLs relative to product pages, so these chunks don't reach the LLM. A targeted authority boost for the newsroom domain on historical/founding questions would fix both.
+
+---
+
 ## How it works
 
 | Stage | Implementation |
