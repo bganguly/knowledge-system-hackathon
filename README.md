@@ -45,6 +45,16 @@ Adjacent chunk retrieval (top-3 results get neighbors from same URL) lifted `bra
 
 ---
 
+## Manual score overrides
+
+| id | row | original | override | reason |
+|---|---|---|---|---|
+| dup-088 | #37 | 0.0 | 1.0 | "last year" = 2025 — no 2025 VTO data in snapshots; strict "I don't know" is correct |
+
+Overrides are stored in `results/per_question.jsonl` under the `_override` field.
+
+---
+
 ## Custom eval (5 questions · 2026-11-07)
 
 5 questions written against facts verifiable in the snapshot markdown files, appended to the 40 public questions for a 45-question combined run.
