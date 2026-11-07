@@ -63,19 +63,19 @@ Adjacent chunk retrieval (top-3 results get neighbors from same URL) lifted `bra
 
 ---
 
-## 40-public vs 45-cumulative (run 2026-11-07 00:20)
+## 40-public vs 45-cumulative (run 2026-11-07 00:54)
 
-Both columns are from the same eval run (`run_2026-11-07_00-20-37_custom.jsonl`). The 40-only column is the public subset extracted from that run; no separate run was executed.
+Both columns are from the same eval run (`run_2026-11-07_00-54-26_custom.jsonl`). The 40-only column is the public subset extracted from that run; no separate run was executed.
 
 | | 40 public (subset) | 45 combined (cumulative) |
 |---|---|---|
 | questions | 40 | 45 |
-| qa_score (weighted) | 0.6620 | **0.6814** |
-| pass | 24 | 28 |
-| partial | 6 | 7 |
-| fail | 10 | 10 |
-| p95 latency | 2.49s | 2.36s |
-| final_score | — | **0.6686** |
+| qa_score (weighted) | 0.7050 | **0.7211** |
+| pass | 26 | 30 |
+| partial | 5 | 6 |
+| fail | 9 | 9 |
+| p95 latency | 3.00s | 2.27s |
+| final_score | — | **0.7136** |
 
 `final_score` is computed by the harness over the full 45-question run only (consistency and speed pillars span all questions and cannot be split cleanly by subset).
 
