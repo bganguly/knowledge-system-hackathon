@@ -106,6 +106,12 @@ _STEM_EXPAND: dict[str, list[str]] = {
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
 
+_HIST_KW_RE = re.compile(
+    r'\b(what year|when did|first introduc|founded|created|established|history of|origin)\b',
+    re.I,
+)
+_YEAR_IN_TEXT_RE = re.compile(r'\b(19|20)\d{2}\b')
+
 
 def _url_authority(url: str) -> int:
     """Higher = more authoritative source."""
@@ -533,12 +539,15 @@ class KnowledgeSystem:
     ) -> list[_Chunk]:
         q_set         = set(_expand_tokens(_tokenize(question)))
         query_is_rate = bool(q_set & _RATE_TERMS)
+        query_is_hist = bool(_HIST_KW_RE.search(question)) and not query_is_rate
 
         combined = []
         for i, s in enumerate(scores):
             s = s * (1.0 + 0.1 * pool[i].authority)
             if query_is_rate and _PCT_RE.search(pool[i].text):
                 s *= 1.5
+            if query_is_hist and _YEAR_IN_TEXT_RE.search(pool[i].text):
+                s *= 2.0
             combined.append((s, i))
         combined.sort(key=lambda x: -x[0])
 
