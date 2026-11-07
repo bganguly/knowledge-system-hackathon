@@ -11,7 +11,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 RUNS_DIR = REPO / "results" / "runs"
 EVAL_FILE = REPO.parent / "hackathon-knowledge-kit-participant" / "eval" / "public_eval.jsonl"
-WIP_FILE = REPO / "results" / "wip.jsonl"
+WIP_FILE = REPO / "results" / "wip_bm25.jsonl"
 OUT = REPO / "results" / "comparison.html"
 
 eval_meta: dict[str, dict] = {}
@@ -200,7 +200,7 @@ for row_num, qid in enumerate(all_ids, 1):
         wip_weighted_score += wsc * weight
 
     highlight = ' style="background:#fffbe6"' if wip_src == "wip" else ""
-    wip_score_style = ' style="background:#fee2e2"' if row_num in FLAGGED_ROWS else (highlight if highlight else "")
+    wip_score_style = ' style="background:#fee2e2"' if (wip_src == "wip" and wsc == 0.0) else (highlight if highlight else "")
     td_wip = (
         f'<td class="run-col wip-col ans-col" data-run="wip"{highlight}>'
         f'<div class="ans-text">{watext}</div>'
