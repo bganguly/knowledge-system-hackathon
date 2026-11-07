@@ -307,6 +307,7 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 [data-hidden] {{ display:none; }}
 .wip-col {{ border-left: 2px solid #f59e0b !important; }}
 .dbg-col {{ min-width: 180px; max-width: 280px; font-size: 0.72rem; color: var(--muted); vertical-align: top; }}
+.dbg-chunks {{ min-width: 540px; max-width: 840px; }}
 .dbg-chunk {{ margin-bottom: 6px; }}
 .dbg-pre {{ white-space: pre-wrap; word-break: break-word; font-size: 0.68rem; margin: 2px 0 0; max-height: 80px; overflow: hidden; }}
 </style>
