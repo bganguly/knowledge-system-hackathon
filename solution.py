@@ -347,12 +347,17 @@ class KnowledgeSystem:
                 f"Use the most authoritative source (official rate page > calculator > blog)."
             )
 
+        _thinking_kwarg = (
+            {"thinking": {"type": "disabled"}}
+            if _LLM_MODEL.startswith("claude-haiku")
+            else {}
+        )
         resp = self._client.messages.create(
             model=_LLM_MODEL,
             max_tokens=512,
             system=system_prompt,
             messages=[{"role": "user", "content": user_msg}],
-            thinking={"type": "disabled"},
+            **_thinking_kwarg,
         )
         text_block = next((b for b in resp.content if b.type == "text"), None)
         if text_block is None:
