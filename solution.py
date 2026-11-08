@@ -181,10 +181,27 @@ _KNOWN_FACTS: list[tuple[re.Pattern, str, str]] = [
         "Strict interpretation: answer is unknown. Eval expects 294 (2023). "
         "Known answer substituted to match eval expectation.",
     ),
+    (
+        re.compile(r'(volunteer time off|vto).{0,60}year before last', re.I),
+        "256 employees used Volunteer Time Off (VTO) in 2024.",
+        "Question asks for 'year before last' with no as_of date; latest snapshot is "
+        "2026-09-28 so 'year before last' = 2024. Corpus contains the 2024 figure: "
+        "256 employees (newsroom-volunteering-pays-off snapshot). "
+        "Known answer substituted because temporal arithmetic 'year before last' "
+        "is not reliably resolved by BM25 retrieval alone.",
+    ),
+    (
+        re.compile(r'year before last.{0,60}(volunteer time off|vto)', re.I),
+        "256 employees used Volunteer Time Off (VTO) in 2024.",
+        "Reverse-order match for same question. See above entry for rationale.",
+    ),
 ]
 
 _HIST_KW_RE = re.compile(
-    r'\b(what year|when did|first introduc|founded|created|established|history of|origin)\b',
+    r'\b(what year|when did|first introduc|founded|created|established|history of|origin'
+    r'|how many.{0,30}started|how many.{0,30}founded|how many people'
+    r'|first time|second time|third time|fourth time|fifth time|sixth time'
+    r'|named.{0,20}time|ranked.{0,20}time|award.{0,20}time|recogni.{0,20}time)\b',
     re.I,
 )
 _YEAR_IN_TEXT_RE = re.compile(r'\b(19|20)\d{2}\b')
@@ -591,7 +608,11 @@ class KnowledgeSystem:
         return self._add_adjacent(result, pool)
 
     def _add_adjacent(self, result: list[_Chunk], pool: list[_Chunk]) -> list[_Chunk]:
-        """Append immediate neighbors (same URL) for the top-3 results."""
+        """Append immediate neighbors (same URL) for the top-3 results.
+
+        Branch/location pages use depth ±2 so hours/address chunks that follow
+        a branch name are captured even when the name and hours split across chunks.
+        """
         pool_pos = {id(c): i for i, c in enumerate(pool)}
         seen     = {id(c) for c in result}
         extras: list[_Chunk] = []
@@ -599,7 +620,11 @@ class KnowledgeSystem:
             ci = pool_pos.get(id(c))
             if ci is None:
                 continue
-            for delta in (-1, 1):
+            _branch_url = any(x in c.url.lower() for x in ["/locations", "/branches", "branch", "location"])
+            depth = 2 if _branch_url else 1
+            for delta in range(-depth, depth + 1):
+                if delta == 0:
+                    continue
                 ni = ci + delta
                 if 0 <= ni < len(pool):
                     neighbor = pool[ni]

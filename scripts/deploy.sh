@@ -169,7 +169,7 @@ elif [[ "${POSITIONAL[0]:-}" == "--custom-eval" ]]; then
   mkdir -p "$REPO_DIR/results"
   cat "$KIT_DIR/eval/public_eval.jsonl" "$CUSTOM_EVAL" > "$COMBINED_EVAL"
   trap 'rm -f "$COMBINED_EVAL"' EXIT
-  echo "==> Running 45-question eval (40 public + 5 custom; RETRIEVAL_MODE=$RETRIEVAL_MODE, model=$LLM_MODEL)"
+  echo "==> Running 46-question eval (40 public + 6 custom; RETRIEVAL_MODE=$RETRIEVAL_MODE, model=$LLM_MODEL)"
   RESULTS_DIR="$REPO_DIR/results"
   "$PY" "$KIT_DIR/harness/run_eval.py" \
     --submission "$REPO_DIR" \
