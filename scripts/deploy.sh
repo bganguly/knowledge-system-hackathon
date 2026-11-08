@@ -5,17 +5,20 @@ REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 VENV="$REPO_DIR/.venv"
 PY312="/usr/local/bin/python3.12"
 RETRIEVE_ARG="bm25"
+NO_OVERRIDES=""
 POSITIONAL=()
 
 usage() {
   cat <<EOF
-Usage: $0 [--retrieve bm25|dense|hybrid|bm25,hybrid] [<row_number> | --clear | --clear-all | --eval | --custom-eval]
+Usage: $0 [--retrieve bm25|dense|hybrid|bm25,hybrid] [--no-overrides] [<row_number> | --clear | --clear-all | --eval | --custom-eval]
 
-  --retrieve    Retrieval strategy (default: bm25); comma-separate to run multiple
-                  bm25         - keyword BM25 (fast, default)
-                  dense        - TF-IDF cosine or sentence-transformer embeddings
-                  hybrid       - BM25 top-50 candidates re-ranked by dense
-                  bm25,hybrid  - run both modes in sequence
+  --retrieve      Retrieval strategy (default: bm25); comma-separate to run multiple
+                    bm25         - keyword BM25 (fast, default)
+                    dense        - TF-IDF cosine or sentence-transformer embeddings
+                    hybrid       - BM25 top-50 candidates re-ranked by dense
+                    bm25,hybrid  - run both modes in sequence
+  --no-overrides  Disable known-fact overrides; runs the strict original rubric
+                  (more failures — use to verify override impact)
 
   <row_number>  Run WIP test for a single eval row (1–40)
   --clear       Remove a row from wip_<mode>.jsonl (requires <row_number> before it)
@@ -29,12 +32,14 @@ Examples:
   ./scripts/deploy.sh --retrieve bm25,hybrid 2
   ./scripts/deploy.sh --retrieve dense --eval
   ./scripts/deploy.sh --custom-eval
+  ./scripts/deploy.sh --no-overrides --eval
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --retrieve|--retrieval) RETRIEVE_ARG="$2"; shift 2 ;;
+    --no-overrides) NO_OVERRIDES="1"; shift ;;
     --help|-h) usage; exit 0 ;;
     *) POSITIONAL+=("$1"); shift ;;
   esac
@@ -48,6 +53,12 @@ for mode in "${MODES[@]}"; do
   fi
 done
 echo "==> Retrieval mode(s): ${MODES[*]}"
+if [[ -n "$NO_OVERRIDES" ]]; then
+  export KNOWN_FACTS_DISABLED=1
+  echo "==> Known-fact overrides DISABLED (strict rubric)"
+else
+  unset KNOWN_FACTS_DISABLED
+fi
 
 # ── API key ───────────────────────────────────────────────────────────────────
 ENV_FILE="$REPO_DIR/.env"

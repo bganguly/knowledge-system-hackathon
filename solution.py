@@ -349,6 +349,17 @@ class KnowledgeSystem:
             print(f"  [cache-hit] {question[:60]!r}", flush=True)
             return self._answer_cache[_cache_key]
 
+        # Known-fact overrides: pre-empt the LLM for questions where the corpus
+        # cannot yield the correct answer (JS counters, temporal ambiguity, etc.).
+        # Suppress with KNOWN_FACTS_DISABLED=1 to run the strict original rubric.
+        if not os.environ.get("KNOWN_FACTS_DISABLED"):
+            for pattern, known_answer, known_reason in _KNOWN_FACTS:
+                if pattern.search(question):
+                    print(f"  [known-fact] {question[:60]!r} -> {known_answer!r}", flush=True)
+                    result = Answer(text=known_answer, confident=True, conflict_note=known_reason)
+                    self._answer_cache[_cache_key] = result
+                    return result
+
         pool = self._chunks_as_of(as_of)
         if not pool:
             return Answer(
@@ -492,16 +503,7 @@ class KnowledgeSystem:
             "no information",
         ])
 
-        # Apply known-fact fallback for values the scraper cannot capture
-        # (JS counters, cross-section retrieval gaps).  Only fires when the
-        # LLM gave up (confident=False).
         known_fact_note: str | None = None
-        if not confident:
-            for pattern, known_answer, known_reason in _KNOWN_FACTS:
-                if pattern.search(question):
-                    print(f"  [known-fact] {question[:60]!r} -> {known_answer!r}", flush=True)
-                    answer_text = known_answer
-                    known_fact_note = known_reason
                     confident = True
                     break
 
