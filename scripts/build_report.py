@@ -39,7 +39,7 @@ report_files = {
 runs: list[dict] = []
 for rp in run_files:
     ts = re.sub(r"^run_", "", rp.stem)
-    display_ts = ts.replace("_", " ")
+    display_ts = ts.replace("_", " ").replace(" custom", "")
     questions: dict[str, dict] = {}
     with open(rp) as f:
         for line in f:
