@@ -285,15 +285,40 @@ for row_num, qid in enumerate(all_ids, 1):
 wip_proj = (wip_weighted_score / wip_total_weight) if wip_total_weight > 0 and HAS_WIP else None
 wip_tested_count = len(wip_questions)
 
+def _wqa(qmap: dict) -> float | None:
+    ws, wt = 0.0, 0.0
+    for qid, row in qmap.items():
+        sc = row.get("score")
+        if sc is not None:
+            w = (eval_meta.get(qid) or {}).get("weight", 1) or 1
+            ws += sc * w
+            wt += w
+    return ws / wt if wt > 0 else None
+
 avg_cells = ""
 for i, run in enumerate(runs):
     qs = run.get("qa_score")
     fs = run.get("final_score")
     qs_str = f"{qs:.4f}" if qs is not None else "—"
     fs_str = f"{fs:.4f}" if fs is not None else "—"
+    pub_q = {qid: r for qid, r in run["questions"].items() if qid.startswith("dup-")}
+    cust_q = {qid: r for qid, r in run["questions"].items() if qid.startswith("cust-")}
+    if cust_q:
+        pqs = _wqa(pub_q)
+        cqs = _wqa(cust_q)
+        n_pub, n_cust = len(pub_q), len(cust_q)
+        pqs_str = f"{pqs:.4f}" if pqs is not None else "—"
+        cqs_str = f"{cqs:.4f}" if cqs is not None else "—"
+        inner = (
+            f'{n_pub}q qa: {pqs_str} &nbsp;·&nbsp; '
+            f'{n_cust}q qa: {cqs_str} &nbsp;·&nbsp; '
+            f'{n_pub+n_cust}q qa: {qs_str} &nbsp; final: {fs_str}'
+        )
+    else:
+        inner = f'qa: {qs_str} &nbsp; final: {fs_str}'
     avg_cells += (
         f'<td class="run-col avg-cell" data-run="{i}" colspan="3">'
-        f'<span style="font-size:0.78rem">qa: {qs_str} &nbsp; final: {fs_str}</span>'
+        f'<span style="font-size:0.78rem">{inner}</span>'
         f'</td>'
     )
 
