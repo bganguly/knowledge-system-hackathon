@@ -184,20 +184,6 @@ _KNOWN_FACTS: list[tuple[re.Pattern, str, str]] = [
         "Strict interpretation: answer is unknown. Eval expects 294 (2023). "
         "Known answer substituted to match eval expectation.",
     ),
-    (
-        re.compile(r'(volunteer time off|vto).{0,60}year before last', re.I),
-        "256 employees used Volunteer Time Off (VTO) in 2024.",
-        "Question asks for 'year before last' with no as_of date; latest snapshot is "
-        "2026-09-28 so 'year before last' = 2024. Corpus contains the 2024 figure: "
-        "256 employees (newsroom-volunteering-pays-off snapshot). "
-        "Known answer substituted because temporal arithmetic 'year before last' "
-        "is not reliably resolved by BM25 retrieval alone.",
-    ),
-    (
-        re.compile(r'year before last.{0,60}(volunteer time off|vto)', re.I),
-        "256 employees used Volunteer Time Off (VTO) in 2024.",
-        "Reverse-order match for same question. See above entry for rationale.",
-    ),
 ]
 
 _HIST_KW_RE = re.compile(
