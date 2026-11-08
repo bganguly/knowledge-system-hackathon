@@ -98,6 +98,9 @@ _STEM_EXPAND: dict[str, list[str]] = {
     # Auto loan synonyms — "2025 vehicle" should match "2024-27 Model Year"
     "vehicle": ["auto", "car", "automobile"],
     "vehicles": ["auto", "car", "automobile"],
+    # Loan amount ceiling — "largest/maximum loan" should match "borrow up to" chunks
+    "largest": ["maximum", "borrow", "limit"],
+    "maximum": ["largest", "borrow", "limit"],
     # CD / certificate synonyms — savings-account page has certificate products
     "certificate": ["cd", "savings", "share"],
     "certificates": ["certificate", "cd", "savings"],

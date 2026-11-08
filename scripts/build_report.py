@@ -120,8 +120,9 @@ wip_header = (
     f'<div class="run-fs">est. token-check · last update: {esc(_wip_latest)}</div>'
     '</th>'
     '<th class="score-col wip-col" data-run="wip">est.</th>'
-    '<th class="chunks-col wip-col" data-run="wip">BM25 Chunks</th>'
 )
+
+LAST_TWO = {RUN_COLS - 1, RUN_COLS - 2}
 
 run_score_sums = [0.0] * RUN_COLS
 run_score_counts = [0] * RUN_COLS
@@ -199,7 +200,7 @@ for row_num, qid in enumerate(all_ids, 1):
         judge_html = "<br>".join(judge_parts) if judge_parts else "—"
 
         chunk_dbg_html = ""
-        if i == RUN_COLS - 1 and sc is not None and sc < 0.20:
+        if i in LAST_TWO and sc is not None and sc < 0.20:
             dbg_key = meta.get("question", qid) + "|||" + (meta.get("as_of") or "")
             dbg_chunks = chunk_debug.get(dbg_key, [])
             if dbg_chunks:
@@ -276,7 +277,6 @@ for row_num, qid in enumerate(all_ids, 1):
         f'<div class="ans-text">{watext}</div>'
         f'</td>'
         f'<td class="score-col wip-col" data-run="wip"{highlight}>{wsc_str}</td>'
-        f'<td class="chunks-col wip-col" data-run="wip">{chunks_html}</td>'
     )
 
     rows_html += f'<tr>{td_meta}{td_runs}{td_wip}</tr>\n'
@@ -296,7 +296,6 @@ def _wqa(qmap: dict) -> float | None:
     return ws / wt if wt > 0 else None
 
 avg_cells = ""
-LAST_TWO = {RUN_COLS - 1, RUN_COLS - 2}
 for i, run in enumerate(runs):
     qs = run.get("qa_score")
     fs = run.get("final_score")
@@ -336,7 +335,7 @@ for i, run in enumerate(runs):
 
 proj_str = f"{wip_proj:.4f}" if wip_proj is not None else "—"
 wip_avg_cell = (
-    f'<td class="run-col wip-col avg-cell" data-run="wip" style="background:#fffbe6" colspan="3">'
+    f'<td class="run-col wip-col avg-cell" data-run="wip" style="background:#fffbe6" colspan="2">'
     f'<span style="font-size:0.78rem">est. qa: {proj_str} '
     f'&nbsp; ({wip_tested_count}/{len(all_ids)} tested)</span>'
     f'</td>'
