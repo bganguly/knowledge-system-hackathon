@@ -521,8 +521,6 @@ class KnowledgeSystem:
         ])
 
         known_fact_note: str | None = None
-                    confident = True
-                    break
 
         sources = []
         seen_urls: set[str] = set()

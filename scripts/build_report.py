@@ -181,12 +181,12 @@ for row_num, qid in enumerate(all_ids, 1):
             run_score_sums[i] += sc
             run_score_counts[i] += 1
 
-        # Judge info: matched, missed, trap_hits, latency
+        # Judge info: matched, missed, trap_hits, cache
         matched = row.get("matched") or []
         missed = row.get("missed") or []
         traps = row.get("trap_hits") or []
         lat = row.get("latency_s")
-        lat_str = f"{lat:.1f}s" if lat is not None else ""
+        cache_hit = lat is not None and lat < 0.1
         judge_parts = []
         if matched:
             judge_parts.append(f'<span class="jok">✓ {esc(", ".join(str(m) for m in matched))}</span>')
@@ -194,12 +194,12 @@ for row_num, qid in enumerate(all_ids, 1):
             judge_parts.append(f'<span class="jmiss">✗ {esc(", ".join(str(m) for m in missed))}</span>')
         if traps:
             judge_parts.append(f'<span class="jtrap">⚠ trap: {esc(", ".join(str(t) for t in traps))}</span>')
-        if lat_str:
-            judge_parts.append(f'<span class="jlat">{lat_str}</span>')
+        if cache_hit:
+            judge_parts.append(f'<span class="jcache">cache used</span>')
         judge_html = "<br>".join(judge_parts) if judge_parts else "—"
 
         chunk_dbg_html = ""
-        if i == RUN_COLS - 1 and sc is not None and sc < 1.0:
+        if i == RUN_COLS - 1 and sc is not None and sc < 0.20:
             dbg_key = meta.get("question", qid) + "|||" + (meta.get("as_of") or "")
             dbg_chunks = chunk_debug.get(dbg_key, [])
             if dbg_chunks:
@@ -296,6 +296,7 @@ def _wqa(qmap: dict) -> float | None:
     return ws / wt if wt > 0 else None
 
 avg_cells = ""
+LAST_TWO = {RUN_COLS - 1, RUN_COLS - 2}
 for i, run in enumerate(runs):
     qs = run.get("qa_score")
     fs = run.get("final_score")
@@ -303,7 +304,18 @@ for i, run in enumerate(runs):
     fs_str = f"{fs:.4f}" if fs is not None else "—"
     pub_q = {qid: r for qid, r in run["questions"].items() if qid.startswith("dup-")}
     cust_q = {qid: r for qid, r in run["questions"].items() if qid.startswith("cust-")}
-    if cust_q:
+    if i in LAST_TWO and cust_q:
+        pqs = _wqa(pub_q)
+        all_q = {**pub_q, **cust_q}
+        n_pub = len(pub_q)
+        n_all = len(all_q)
+        pqs_str = f"{pqs:.4f}" if pqs is not None else "—"
+        inner = (
+            f'{n_pub}q &nbsp; qa: {pqs_str} &nbsp; final: — &nbsp;'
+            f'&nbsp;|&nbsp; '
+            f'{n_all}q &nbsp; qa: {qs_str} &nbsp; final: {fs_str}'
+        )
+    elif cust_q:
         pqs = _wqa(pub_q)
         cqs = _wqa(cust_q)
         n_pub, n_cust = len(pub_q), len(cust_q)
@@ -403,10 +415,10 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 .chunk-body {{ margin-top:4px; }}
 .chunk-item {{ margin-bottom: 8px; border-left: 2px solid var(--border); padding-left: 6px; }}
 .chunk-pre {{ white-space: pre-wrap; word-break: break-word; font-size: 0.68rem; margin: 2px 0 0; line-height: 1.4; }}
-.jok {{ color: #16a34a; display:block; font-size:0.72rem; }}
+.jok {{ color: var(--fg); display:block; font-size:0.72rem; }}
 .jmiss {{ color: #dc2626; display:block; font-size:0.72rem; }}
 .jtrap {{ color: #d97706; display:block; font-size:0.72rem; }}
-.jlat {{ color: var(--muted); display:block; font-size:0.70rem; margin-top:2px; }}
+.jcache {{ color: var(--muted); display:block; font-size:0.70rem; font-style:italic; margin-top:2px; }}
 </style>
 </head>
 <body>
