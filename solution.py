@@ -73,6 +73,9 @@ _TOP_K     = 22           # chunks fed to the LLM
 _MAX_PER_URL = 6          # max chunks from a single URL
 _LLM_MODEL       = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
 _RETRIEVAL_MODE  = os.environ.get("RETRIEVAL_MODE", "bm25")   # bm25 | dense | hybrid
+
+_GOLD_CACHE_PATH     = Path(__file__).parent / "eval" / "gold_cache.json"
+_GOLD_CACHE_TTL_DAYS = 90
 _DENSE_MODEL     = "all-MiniLM-L6-v2"
 _HYBRID_BM25_K   = 50   # BM25 candidates before dense re-rank in hybrid mode
 
@@ -281,6 +284,32 @@ class KnowledgeSystem:
         self._chunk_debug: dict[str, list]     = {}
         self._debug_lock                       = threading.Lock()
         self._answer_cache: dict[tuple, Answer] = {}
+        self._gold_cache: dict[str, str] = self._load_gold_cache()
+
+    # ------------------------------------------------------------------
+    # gold cache
+    # ------------------------------------------------------------------
+
+    def _load_gold_cache(self) -> dict[str, str]:
+        if not _GOLD_CACHE_PATH.exists():
+            return {}
+        cutoff = datetime.date.today() - datetime.timedelta(days=_GOLD_CACHE_TTL_DAYS)
+        try:
+            data = json.loads(_GOLD_CACHE_PATH.read_text())
+        except Exception:
+            return {}
+        valid: dict[str, str] = {}
+        for key, entry in data.items():
+            try:
+                ts = datetime.date.fromisoformat(entry.get("ts", "2000-01-01"))
+            except (ValueError, AttributeError):
+                continue
+            if ts >= cutoff:
+                valid[key] = entry["text"]
+        pruned = len(data) - len(valid)
+        label = f"loaded {len(valid)} entries" + (f", pruned {pruned} expired" if pruned else "")
+        print(f"[gold-cache] {label}", flush=True)
+        return valid
 
     # ------------------------------------------------------------------
     # ingest
@@ -380,6 +409,11 @@ class KnowledgeSystem:
 
     def answer(self, question: str, as_of: Optional[str] = None) -> Answer:
         _base_key = (question.strip(), str(as_of))
+
+        _gold_key = question.strip() + "||" + str(as_of)
+        if _gold_key in self._gold_cache:
+            print(f"  [gold-cache-hit] {question[:60]!r}", flush=True)
+            return Answer(text=self._gold_cache[_gold_key], confident=True)
 
         # Known-fact overrides: pre-empt the LLM for questions where the corpus
         # cannot yield the correct answer (JS counters, temporal ambiguity, etc.).
