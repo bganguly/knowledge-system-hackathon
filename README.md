@@ -59,15 +59,15 @@ python harness/run_eval.py \
 
 ## Current eval status
 
-Latest run: `run_2026-11-08_22-06-45_custom` · 56 questions (40 provided + 16 custom)
+Latest run: `run_2026-11-09_10-19-54_custom` · 56 questions (40 provided + 16 custom)
 
 | Subset | Score 1.0 | Score 0.85 | Score 0.50 | Score 0.0 | qa\_score | final\_score |
 |---|---|---|---|---|---|---|
-| 40 provided | 32 | 2 | 1 | 5 | 0.8434 | 0.8346 |
-| 16 custom | 10 | 0 | 2 | 4 | 0.6538 | 0.6470 |
-| **56 total** | **42** | **2** | **3** | **9** | **0.7994** | **0.7911** |
+| 40 provided | 33 | 2 | 1 | 4 | 0.8744 | 0.8706 |
+| 16 custom | 12 | 0 | 2 | 2 | 0.7821 | — |
+| **56 total** | **45** | **2** | **3** | **6** | **0.8530** | **0.8492** |
 
-Consistency: 1.00 · Speed: 0.94 (p95 3.1s)
+Consistency: 1.00 · Speed: 0.975 (p95 ~2.5s)
 
 ---
 
