@@ -62,11 +62,14 @@ def main():
         answer_text = r.get("answer", {}).get("text", "")
         if not answer_text:
             continue
+        raw_sources = r.get("answer", {}).get("sources") or []
+        sources = [{"url": s["url"], "snapshot_id": s.get("snapshot_id")}
+                   for s in raw_sources if isinstance(s, dict) and s.get("url")]
         if key in pruned:
             refreshed += 1
         else:
             added += 1
-        pruned[key] = {"text": answer_text, "ts": today}
+        pruned[key] = {"text": answer_text, "sources": sources, "ts": today}
 
     GOLD_CACHE_PATH.parent.mkdir(exist_ok=True)
     GOLD_CACHE_PATH.write_text(json.dumps(pruned, indent=2))

@@ -284,13 +284,13 @@ class KnowledgeSystem:
         self._chunk_debug: dict[str, list]     = {}
         self._debug_lock                       = threading.Lock()
         self._answer_cache: dict[tuple, Answer] = {}
-        self._gold_cache: dict[str, str] = self._load_gold_cache()
+        self._gold_cache: dict[str, dict] = self._load_gold_cache()
 
     # ------------------------------------------------------------------
     # gold cache
     # ------------------------------------------------------------------
 
-    def _load_gold_cache(self) -> dict[str, str]:
+    def _load_gold_cache(self) -> dict[str, dict]:
         if not _GOLD_CACHE_PATH.exists():
             return {}
         cutoff = datetime.date.today() - datetime.timedelta(days=_GOLD_CACHE_TTL_DAYS)
@@ -298,14 +298,14 @@ class KnowledgeSystem:
             data = json.loads(_GOLD_CACHE_PATH.read_text())
         except Exception:
             return {}
-        valid: dict[str, str] = {}
+        valid: dict[str, dict] = {}
         for key, entry in data.items():
             try:
                 ts = datetime.date.fromisoformat(entry.get("ts", "2000-01-01"))
             except (ValueError, AttributeError):
                 continue
             if ts >= cutoff:
-                valid[key] = entry["text"]
+                valid[key] = entry
         pruned = len(data) - len(valid)
         label = f"loaded {len(valid)} entries" + (f", pruned {pruned} expired" if pruned else "")
         print(f"[gold-cache] {label}", flush=True)
@@ -413,7 +413,10 @@ class KnowledgeSystem:
         _gold_key = question.strip() + "||" + str(as_of)
         if _gold_key in self._gold_cache:
             print(f"  [gold-cache-hit] {question[:60]!r}", flush=True)
-            return Answer(text=self._gold_cache[_gold_key], confident=True)
+            _ge = self._gold_cache[_gold_key]
+            _srcs = [Source(url=s["url"], snapshot_id=s.get("snapshot_id"))
+                     for s in _ge.get("sources", []) if s.get("url")]
+            return Answer(text=_ge["text"], confident=True, sources=_srcs or None)
 
         # Known-fact overrides: pre-empt the LLM for questions where the corpus
         # cannot yield the correct answer (JS counters, temporal ambiguity, etc.).
