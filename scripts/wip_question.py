@@ -18,6 +18,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 SNAP_DIR = REPO / "snapshots"
 EVAL_FILE = REPO.parent / "hackathon-knowledge-kit-participant" / "eval" / "public_eval.jsonl"
+CUSTOM_EVAL_FILE = REPO / "eval" / "custom_eval.jsonl"
 
 _MODE = os.environ.get("RETRIEVAL_MODE", "bm25")
 WIP_FILE = REPO / "results" / f"wip_{_MODE}.jsonl"
@@ -29,12 +30,15 @@ WIP_FILE = REPO / "results" / f"wip_{_MODE}.jsonl"
 def _load_eval() -> tuple[list[str], dict]:
     all_ids = []
     meta = {}
-    with open(EVAL_FILE) as f:
-        for line in f:
-            if line.strip():
-                r = json.loads(line)
-                all_ids.append(r["id"])
-                meta[r["id"]] = r
+    for path in [EVAL_FILE, CUSTOM_EVAL_FILE]:
+        if not path.exists():
+            continue
+        with open(path) as f:
+            for line in f:
+                if line.strip():
+                    r = json.loads(line)
+                    all_ids.append(r["id"])
+                    meta[r["id"]] = r
     # keep eval file order — row n in deploy.sh == line n of the eval file
     return all_ids, meta
 
