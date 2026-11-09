@@ -834,12 +834,13 @@ class KnowledgeSystem:
         )
         # Boost Share Savings chunks for generic savings-tier queries so they
         # outcompete other product rows that happen to match the queried rate.
-        # Exclude "bright" so Bright Savings queries don't trigger the Share Savings boost.
+        # Exclude named savings products so their queries don't trigger this boost.
         query_is_savings_tier = (
             bool(re.search(r'\bsavings?\b', question, re.I))
-            and not bool(re.search(r'\b(health|hsa|medical|fsa|money market|investor|checking|mortgage|auto|loan|credit|certificate|cd|bright)\b', question, re.I))
+            and not bool(re.search(r'\b(health|hsa|medical|fsa|money market|investor|checking|mortgage|auto|loan|credit|certificate|cd|bright|launchpad)\b', question, re.I))
         )
         query_is_bright = bool(re.search(r'\bbright\b', question, re.I))
+        query_is_launchpad = bool(re.search(r'\blaunchpad\b', question, re.I))
 
         combined = []
         for i, s in enumerate(scores):
@@ -854,6 +855,8 @@ class KnowledgeSystem:
             if query_is_savings_tier and re.search(r'\bShare\s+Savings\b', pool[i].text, re.I):
                 s *= 2.0
             if query_is_bright and re.search(r'\bBright\b', pool[i].text, re.I):
+                s *= 2.0
+            if query_is_launchpad and re.search(r'\bLaunchpad\b', pool[i].text, re.I):
                 s *= 2.0
             combined.append((s, i))
         combined.sort(key=lambda x: -x[0])
