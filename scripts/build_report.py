@@ -196,6 +196,21 @@ for row_num, qid in enumerate(all_ids, 1):
             judge_parts.append(f'<span class="jtrap">⚠ trap: {esc(", ".join(str(t) for t in traps))}</span>')
         if cache_hit:
             judge_parts.append(f'<span class="jcache">cache used</span>')
+        if i == RUN_COLS - 1 and sc == 1.0:
+            ans_sources = (row.get("answer") or {}).get("sources") or []
+            exp_srcs = meta.get("expected_sources") or []
+            exp_base = {e.split("#")[0].rstrip("/") for e in exp_srcs}
+            if ans_sources:
+                src_parts = []
+                for si, s in enumerate(ans_sources, 1):
+                    url = (s.get("url") or "")
+                    path = url.replace("https://www.dupaco.com", "") or "/"
+                    base = url.split("#")[0].rstrip("/")
+                    tick = " ✓" if (exp_base and base in exp_base) else ""
+                    src_parts.append(f"#{si}:{esc(path)}{tick}")
+                judge_parts.append(
+                    f'<span class="jsrc">{"<br>".join(src_parts)}</span>'
+                )
         judge_html = "<br>".join(judge_parts) if judge_parts else "—"
 
         chunk_dbg_html = ""
@@ -417,6 +432,7 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 .jmiss {{ color: #dc2626; display:block; font-size:0.72rem; }}
 .jtrap {{ color: #d97706; display:block; font-size:0.72rem; }}
 .jcache {{ color: var(--muted); display:block; font-size:0.70rem; font-style:italic; margin-top:2px; }}
+.jsrc {{ color: #0369a1; display:block; font-size:0.68rem; font-family:monospace; margin-top:3px; word-break:break-all; }}
 </style>
 </head>
 <body>
