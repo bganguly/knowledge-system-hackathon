@@ -13,7 +13,7 @@ Conflict detection compares percentage values across snapshot dates for the same
 - [Approaches considered and skipped](#approaches-considered-and-skipped)
 - [Sample eval run log](#sample-eval-run-log)
 - [Manual score overrides](#manual-score-overrides)
-- [Custom eval](#custom-eval-5-questions--2026-11-07)
+- [Custom eval](#custom-eval-16-questions)
 - [40-public vs 45-cumulative](#40-public-vs-45-cumulative-run-2026-11-07-0104)
 - [How it works](#how-it-works)
 - [Setup](#setup-first-time)
@@ -87,21 +87,28 @@ Overrides are stored in `results/per_question.jsonl` under the `_override` field
 
 ---
 
-## Custom eval (5 questions · 2026-11-07)
+## Custom eval (16 questions)
 
-5 questions written against facts verifiable in the snapshot markdown files, appended to the 40 public questions for a 45-question combined run.
+16 questions written against facts verifiable in the snapshot markdown files.
 
-**Per custom question**
-
-| id | category | score | verdict | note |
-|---|---|---|---|---|
-| cust-001 | entity_attribution | 0.50 | PARTIAL | Found "1948"; still missing "10" — founding count shares the same newsroom boilerplate but LLM didn't state it |
-| cust-002 | current_value | 1.00 | PASS | "$1,500 AD&D insurance, ages 18–85" retrieved correctly from about/join |
-| cust-003 | current_value | 1.00 | PASS | "$25 minimum deposit" retrieved correctly from about/join |
-| cust-004 | entity_attribution | 1.00 | **PASS** | "Holiday Club created 1954" — fixed by historical boost; year-bearing newsroom chunks now surface |
-| cust-005 | temporal_as_of | 1.00 | PASS | Launchpad Savings 3.25% APY (as_of 2026-09-28) retrieved correctly from latest snapshot |
-
-**Analysis:** Historical keyword detection (`what year`, `when did`, `first introduce`, `founded`) now triggers a 2× boost on chunks whose text contains a 4-digit year. This is gated behind `not query_is_rate` so rate questions are unaffected. cust-004 flipped from FAIL→PASS. cust-001 still partial — the LLM receives the "Founded in 1948 by 10 employees" chunk but chose not to state the count; a prompt-level fix would be needed.
+| # | Question | Expected answer | Must include |
+|---|---|---|---|
+| 1 | In what year was Dupaco Credit Union founded, and how many people started it? | Dupaco was founded in 1948 by 10 meatpacking employees who each pooled $5. | 1948, 10 |
+| 2 | What free insurance benefit does Dupaco automatically provide to member-owners, and what is the coverage amount? | Dupaco provides free $1,500 Accidental Death and Dismemberment (AD&D) insurance to member-owners ages 18 to 85. | 1,500, 18 |
+| 3 | What is the minimum deposit required to open a primary Dupaco membership? | The minimum deposit to open a primary Dupaco membership share is $25. | 25 |
+| 4 | What year did Dupaco first introduce its Holiday Club savings account? | Dupaco's Holiday Club savings account was created in 1954. | 1954 |
+| 5 | What APY does the Launchpad Savings account offer? | The Launchpad Savings account pays 3.25% APY on balances from $5 to $1,000. | 3.25 |
+| 6 | How many Dupaco employees used Volunteer Time Off in year before last? | 256 employees used Volunteer Time Off (VTO) in 2024. | 256 |
+| 7 | What is the largest small business loan available at Dupaco? | Dupaco's small business loan covers financing needs up to $50,000. | 50,000 |
+| 8 | What business credit cards do you offer and what are their APRs? | Dupaco offers the Business Platinum Visa at 15.5% APR and the Business Rewards Visa at 20.5% APR. | Business Platinum, Business Rewards, 15.5, 20.5 |
+| 9 | Was the Hy-Vee branch open January of this year? | The Hy-Vee branch was open in January 2026; it closed on March 31, 2026. | March 31, 2026 |
+| 10 | Give me details on Investor's Choice. | $2,500 minimum to open and no limit on your balance. | 2,500, 250,000 |
+| 11 | Who is eligible to join? | You live or work within our charter area. You have an immediate family member who's a member. You belong to the Rural Ideas Network. | https://www.ruralideas.net/partner-pages/dupaco-credit-union |
+| 12 | Is Asbury branch open now? | No. | no |
+| 13 | Any college scholarships? | Dupaco Foundation renewal college scholarship program. | 60,000 |
+| 14 | Loan rates on 2019 model motorcycle for 5 year. | 6.49% APR. | 6.49 |
+| 15 | Loan rates on 2019 model motorcycle for 3 year. | Unable to answer. | — |
+| 16 | Loan rates on 2019 model motorcycle for 5 year as of May. | 6.14% APR. | 6.14 |
 
 ---
 
