@@ -841,6 +841,10 @@ class KnowledgeSystem:
         )
         query_is_bright = bool(re.search(r'\bbright\b', question, re.I))
         query_is_launchpad = bool(re.search(r'\blaunchpad\b', question, re.I))
+        query_is_small_biz_loan = (
+            bool(re.search(r'\bsmall\s+business\b', question, re.I))
+            and bool(re.search(r'\bloan\b', question, re.I))
+        )
 
         combined = []
         for i, s in enumerate(scores):
@@ -857,6 +861,8 @@ class KnowledgeSystem:
             if query_is_bright and re.search(r'\bBright\b', pool[i].text, re.I):
                 s *= 2.0
             if query_is_launchpad and re.search(r'\bLaunchpad\b', pool[i].text, re.I):
+                s *= 2.0
+            if query_is_small_biz_loan and re.search(r'business/loans/small-business', pool[i].url, re.I):
                 s *= 2.0
             combined.append((s, i))
         combined.sort(key=lambda x: -x[0])
