@@ -113,6 +113,8 @@ _STEM_EXPAND: dict[str, list[str]] = {
     "apr": ["aprs", "rate", "apy"],
     # Mobile wallet synonyms — boost Apple/Google/Samsung Pay chunks for wallet queries
     "wallet": ["apple", "pay", "google", "samsung"],
+    # Founder/history synonyms — "who founded" should match about/history chunks
+    "founder": ["employees", "meatpacking", "started", "history"],
 }
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
@@ -219,6 +221,8 @@ def _url_authority(url: str) -> int:
     ]):
         return 5          # official product / rate pages
     if any(x in u for x in ["/personal/", "/business/"]):
+        return 4
+    if "/about" in u:
         return 4
     return 3
 
@@ -455,9 +459,15 @@ class KnowledgeSystem:
             "or tier, list ALL available rates/options from the most recent official source. "
             "Do NOT ask for clarification. Do NOT say 'the question doesn't specify' — "
             "just provide the full list.\n"
+            "- If asked generically about a product category (e.g. 'what checking accounts "
+            "does Dupaco offer', 'what savings products'), enumerate ALL named product "
+            "variants found in the excerpts. Never return just one variant when multiple exist.\n"
             "- When answering about a branch's status (open, closed, relocated), "
             "always state the specific date if one appears in the excerpts. "
             "Example: 'The Hy-Vee branch closed on March 31, 2026.'\n"
+            "- If multiple branch-specific schedules appear in the excerpts "
+            "(e.g. different hours for different locations), list each branch's "
+            "hours separately — do not collapse to a single representative schedule.\n"
             "- Be concise. Members need a quick, accurate answer.\n"
             "- Do NOT invent numbers. Only state values that appear in the excerpts.\n"
             "- Never restate or echo the question back. Lead with the value or fact. "
@@ -631,7 +641,7 @@ class KnowledgeSystem:
             ci = pool_pos.get(id(c))
             if ci is None:
                 continue
-            _branch_url = any(x in c.url.lower() for x in ["/locations", "/branches", "branch", "location"])
+            _branch_url = any(x in c.url.lower() for x in ["/locations", "/branches", "branch", "location", "/hours"])
             _credit_url = any(x in c.url.lower() for x in ["/credit", "credit-card", "visa"])
             depth = 2 if (_branch_url or _credit_url) else 1
             for delta in range(-depth, depth + 1):
