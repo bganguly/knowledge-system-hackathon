@@ -527,6 +527,11 @@ class KnowledgeSystem:
                     quote=quote,
                 ))
 
+        chunks = [
+            Source(url=c.url, snapshot_id=c.snapshot_id, quote=c.text)
+            for c in relevant
+        ]
+
         url_override_note: str | None = known_fact_note
         if answer_text in _URL_ALIASES:
             canonical, reason = _URL_ALIASES[answer_text]
@@ -539,6 +544,7 @@ class KnowledgeSystem:
             sources=sources,
             confident=confident,
             conflict_note=url_override_note,
+            chunks=chunks,
         )
         if confident:
             self._answer_cache[_cache_key] = result
