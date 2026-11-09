@@ -70,7 +70,32 @@ def _normalize_loan_query(text: str) -> str:
 _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
 _TOP_K     = 22           # chunks fed to the LLM
+
+# Newsroom/blog metadata patterns that add noise without answerable content.
+# Applied paragraph-by-paragraph before chunking so they never reach BM25.
+_SKIP_PARA_RE = re.compile(
+    r"^\s*("
+    r"\d+\s+min\s+read"                        # "2 min read"
+    r"|[A-Z][a-z]+\s+\d{1,2},\s+\d{4}"        # "January 05, 2026"
+    r"|Share\s+this\s+article"
+    r"|\[Keep\s+reading\].*"                   # "[Keep reading](url)"
+    r"|Keep\s+reading"
+    r"|Handpicked\s+[Ff]or\s+[Yy]ou"
+    r"|!\[.*?\]\(.*?\)"                        # standalone image markdown
+    r"|\[!\[.*?\]\(.*?\)\]\(.*?\)"             # image wrapped in link [![](img)](url)
+    r"|#{1,6}\s+\[.*?\]\(https?://[^)]+\)"     # heading that is only a link ## [Title](url)
+    r"|\\#\s*#.*"                              # press release ### divider (with any trailing text)
+    r"|✕.*"                                    # modal dismiss (✕ alone or ✕\n[Continue])
+    r"|CLICK\s+HERE.*"                         # call-to-action nav text with trailing URL
+    r"|\[Continue\]\(https?://[^)]+\)"         # orphan Continue nav link
+    r"|For\s+(more|further|additional)\s+information\b.*"  # redirect/see-also lines
+    r"|Share\s+your\s+info\b.*"               # CTA form-intro lines
+    r"|What'?s\s+your\s+(email|phone|name)\b.*"  # form field labels
+    r")\s*$",
+    re.IGNORECASE,
+)
 _MAX_PER_URL = 6          # max chunks from a single URL
+_HSA_CHUNK_RE = re.compile(r'Health\s+Savings\b', re.IGNORECASE)
 _LLM_MODEL       = os.environ.get("LLM_MODEL", "claude-haiku-5-5")
 _RETRIEVAL_MODE  = os.environ.get("RETRIEVAL_MODE", "bm25")   # bm25 | dense | hybrid
 
@@ -122,6 +147,9 @@ _STEM_EXPAND: dict[str, list[str]] = {
     "apr": ["aprs", "rate", "apy"],
     # Mobile wallet synonyms — boost Apple/Google/Samsung Pay chunks for wallet queries
     "wallet": ["apple", "pay", "google", "samsung"],
+    # Recognition synonyms — "recognition" in query should match "recognized/recognizes" in chunks
+    "recognition": ["recognized", "recognizing", "recognizes", "recognitions"],
+    "recognized": ["recognition", "recognizing"],
     # Founder/history synonyms — "who founded" should match about/history chunks
     "founder": ["employees", "meatpacking", "started", "history"],
     # Loan term months plural/singular
@@ -323,8 +351,17 @@ class KnowledgeSystem:
             hist = self._page_history.setdefault(page.url, [])
             hist.append((snapshot.snapshot_id, snapshot.taken_on, page.markdown))
 
+            md = page.markdown
+            md = re.sub(r'\[!\[[^\]]*\]\([^)]*\)\]\([^)]*\)', '', md)  # strip linked images [![alt](img)](url)
+            md = re.sub(r'!\[[^\]]*\]\([^)]*\)', '', md)  # strip remaining bare images
+            md = re.sub(r'^\s*[-*]\s+\[[^\]]*\]\(https?://[^)]+\)\s*$', '', md, flags=re.MULTILINE)  # strip list-item nav links
+            _hfy = re.search(r'handpicked\s+for\s+you', md, re.IGNORECASE)
+            if _hfy:
+                cut = md.rfind('\n\n', 0, _hfy.start())
+                md = md[:cut] if cut >= 0 else md[:_hfy.start()]
             paras = _join_short_paras(
-                [p.strip() for p in page.markdown.split("\n\n")]
+                [p.strip() for p in md.split("\n\n")
+                 if p.strip() and not _SKIP_PARA_RE.match(p.strip())]
             )
             seen_in_page: set[str] = set()
             for para in paras:
@@ -493,8 +530,20 @@ class KnowledgeSystem:
             "- Never reference superseded, historical, or outdated values. "
             "Report the current authoritative value only, or say you don't know.\n"
             "- 'Savings tiers' or 'savings account tiers' means the Share Savings "
-            "product specifically. Investor's Choice Money Market is a separate "
-            "account category — do NOT treat it as a savings tier.\n"
+            "product specifically. Investor's Choice Money Market, Health Savings "
+            "Account (HSA), and all other account types are SEPARATE categories — "
+            "do NOT treat them as savings tiers. If asked whether a specific rate "
+            "exists in savings tiers and that rate appears ONLY in a non-Share-Savings "
+            "account, the answer is No — state the actual Share Savings maximum instead.\n"
+            "- When asked whether a specific rate percentage exists in savings/certificate "
+            "tiers (e.g. 'do savings tiers pay 0.35%?'), look through ALL tier rows in "
+            "the excerpts. If that exact rate does NOT appear in ANY tier row for that "
+            "product, answer No and state the actual highest rate in that product. "
+            "Do not answer Yes unless you can point to a specific tier row containing "
+            "that exact rate.\n"
+            "- When a question asks about 'savings' without naming a specific account "
+            "type (Money Market, HSA, Investor's Choice, etc.), answer ONLY about "
+            "Share Savings. Ignore rates from other account types entirely.\n"
             "- For factual Dupaco statistics (number of branches, employee count), "
             "use the value cited most consistently across sources; newsroom/about "
             "boilerplate is reliable for these facts.\n"
@@ -663,6 +712,13 @@ class KnowledgeSystem:
         return self._retrieve_bm25(question, pool)
 
     def _retrieve_bm25(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
+        # Health Savings / HSA chunks are only relevant when explicitly asked about.
+        # Filter them out for generic savings queries so they don't consume slots
+        # that should go to Share Savings tier rows.
+        hsa_query = bool(re.search(r'\b(health|hsa|fsa|medical)\b', question, re.IGNORECASE))
+        if not hsa_query:
+            pool = [c for c in pool if not _HSA_CHUNK_RE.search(c.text)]
+
         q_tokens = _expand_tokens(_tokenize(_normalize_loan_query(question)))
 
         if _HAS_BM25:
@@ -751,6 +807,12 @@ class KnowledgeSystem:
             bool(re.search(r'\b(open|closed|closure|still open|close)\b', question, re.I))
             and bool(re.search(r'\b(branch|location|office|lobby)\b', question, re.I))
         )
+        # Boost Share Savings chunks for generic savings-tier queries so they
+        # outcompete other product rows that happen to match the queried rate.
+        query_is_savings_tier = (
+            bool(re.search(r'\bsavings?\b', question, re.I))
+            and not bool(re.search(r'\b(health|hsa|medical|fsa|money market|investor|checking|mortgage|auto|loan|credit|certificate|cd)\b', question, re.I))
+        )
 
         combined = []
         for i, s in enumerate(scores):
@@ -762,13 +824,22 @@ class KnowledgeSystem:
                 s *= 1.5
             if query_is_hist and _YEAR_IN_TEXT_RE.search(pool[i].text):
                 s *= 2.0
+            if query_is_savings_tier and re.search(r'\bShare\s+Savings\b', pool[i].text, re.I):
+                s *= 2.0
             combined.append((s, i))
         combined.sort(key=lambda x: -x[0])
 
         url_counts: dict[str, int] = {}
+        url_seen_texts: dict[str, set[str]] = {}
         result: list[_Chunk] = []
         for _, i in combined:
             url = pool[i].url
+            text = pool[i].text
+            seen = url_seen_texts.setdefault(url, set())
+            text_key = text  # exact-dedup: same content across snapshots collapses; different table rows do not
+            if text_key in seen:
+                continue  # near-duplicate from another snapshot — skip entirely
+            seen.add(text_key)
             if url_counts.get(url, 0) < _MAX_PER_URL:
                 url_counts[url] = url_counts.get(url, 0) + 1
                 result.append(pool[i])
