@@ -14,12 +14,46 @@ Conflict detection compares percentage values across snapshot dates for the same
 - [Artifacts](#artifacts)
 - [Approaches considered and skipped](#approaches-considered-and-skipped)
 - [Sample eval run log](#sample-eval-run-log)
-- [Manual score overrides](#manual-score-overrides)
+- [Manual score overrides (optional)](#manual-score-overrides-optional)
 - [Sample custom eval](#sample-custom-eval)
 - [How it works](#how-it-works)
 - [Stack](#stack)
 - [Repo policy](#repo-policy)
 - [Development history](#development-history)
+
+---
+
+## Setup (first time)
+
+```bash
+pip install -r requirements.txt
+export ANTHROPIC_API_KEY=sk-ant-...
+```
+
+The LLM model defaults to `claude-haiku-5-5`. Override with the `LLM_MODEL` env var:
+
+```bash
+export LLM_MODEL=claude-sonnet-4-5
+```
+
+## Running the eval
+
+**First run / evaluator use** — from inside the kit directory, point `--submission` here:
+
+```bash
+cd /path/to/hackathon-knowledge-kit-participant
+python harness/run_eval.py \
+  --submission /path/to/knowledge-system-hackathon \
+  --eval eval/public_eval.jsonl
+```
+
+**Repeated local use** — `deploy.sh` wraps the above, handles snapshot extraction, and loads the key from `.env` if not already set. It defaults to `../hackathon-knowledge-kit-participant` (sibling folder); pass a path to override. Second arg overrides the model:
+
+```bash
+./scripts/deploy.sh                                        # uses ../hackathon-knowledge-kit-participant
+./scripts/deploy.sh /other/path/to/kit
+./scripts/deploy.sh /other/path/to/kit claude-sonnet-4-5
+```
 
 ---
 
@@ -76,7 +110,7 @@ Adjacent chunk retrieval (top-3 results get neighbors from same URL) lifted `bra
 
 ---
 
-## Manual score overrides
+## Manual score overrides (optional)
 
 | id | row | original | override | reason |
 |---|---|---|---|---|
@@ -108,40 +142,6 @@ Sample of 5 of 16 questions written against facts verifiable in the snapshot mar
 | **Generation** | Claude Haiku (`claude-haiku-5-5`); prompt enforces tier disambiguation (48-mo ≠ 60-mo, rate ≠ APY) and hard "I don't know" when answer absent |
 | **Temporal filtering** | `as_of` date filters to the latest snapshot where `taken_on ≤ as_of`; default is the newest snapshot |
 | **Conflict detection** | On each `ingest()`, regex-extracts percentages per URL and flags values that changed across snapshots |
-
----
-
-## Setup (first time)
-
-```bash
-pip install -r requirements.txt
-export ANTHROPIC_API_KEY=sk-ant-...
-```
-
-The LLM model defaults to `claude-haiku-5-5`. Override with the `LLM_MODEL` env var:
-
-```bash
-export LLM_MODEL=claude-sonnet-4-5   # or any other claude-* model ID
-```
-
-## Running the eval
-
-**First run / evaluator use** — from inside the kit directory, point `--submission` here:
-
-```bash
-cd /path/to/hackathon-knowledge-kit-participant
-python harness/run_eval.py \
-  --submission /path/to/knowledge-system-hackathon \
-  --eval eval/public_eval.jsonl
-```
-
-**Repeated local use** — `deploy.sh` wraps the above, handles snapshot extraction, and loads the key from `.env` if not already set. It defaults to `../hackathon-knowledge-kit-participant` (sibling folder); pass a path to override. Second arg overrides the model:
-
-```bash
-./scripts/deploy.sh                                        # uses ../hackathon-knowledge-kit-participant
-./scripts/deploy.sh /other/path/to/kit
-./scripts/deploy.sh /other/path/to/kit claude-sonnet-4-5
-```
 
 ---
 
