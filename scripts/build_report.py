@@ -201,7 +201,7 @@ for row_num, qid in enumerate(all_ids, 1):
             judge_parts.append(f'<span class="jtrap">⚠ trap: {esc(", ".join(str(t) for t in traps))}</span>')
         if cache_hit:
             judge_parts.append(f'<span class="jcache">cache used</span>')
-        if i == RUN_COLS - 1 and sc == 1.0:
+        if i == RUN_COLS - 1 and sc is not None and sc > 0:
             ans_sources = (row.get("answer") or {}).get("sources") or []
             exp_srcs = meta.get("expected_sources") or []
             exp_base = {e.split("#")[0].rstrip("/") for e in exp_srcs}
