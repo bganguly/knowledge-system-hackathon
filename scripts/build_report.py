@@ -155,7 +155,6 @@ for row_num, qid in enumerate(all_ids, 1):
     weight = meta.get("weight", 1) or 1
 
     td_meta = (
-        f'<td class="num-col">{row_num}</td>'
         f'<td class="snap-col">{esc(snap_ids_text)}</td>'
         f'<td class="wt-col">{weight}</td>'
         f'<td class="cat-col">{category}</td>'
@@ -200,22 +199,22 @@ for row_num, qid in enumerate(all_ids, 1):
         judge_html = "<br>".join(judge_parts) if judge_parts else "—"
 
         chunk_dbg_html = ""
-        if i in LAST_TWO and sc is not None and sc < 0.20:
-            dbg_key = meta.get("question", qid) + "|||" + (meta.get("as_of") or "")
-            dbg_chunks = chunk_debug.get(dbg_key, [])
-            if dbg_chunks:
+        if sc is not None and sc < 1.0:
+            ans_chunks = (row.get("answer") or {}).get("chunks") or []
+            if ans_chunks:
                 cp = []
-                for ci, c in enumerate(dbg_chunks, 1):
+                for ci, c in enumerate(ans_chunks, 1):
                     path = (c.get("url") or "").replace("https://www.dupaco.com", "")
-                    snippet = esc(c.get("text") or "")
-                    auth = c.get("authority", "")
+                    snippet = esc(c.get("quote") or "")
+                    snap = esc(c.get("snapshot_id") or "")
                     cp.append(
-                        f'<div class="chunk-item"><b>{ci}. [{auth}] {esc(path)}</b>'
+                        f'<div class="chunk-item"><b>{ci}. {esc(path)}</b>'
+                        f' <span style="color:var(--muted)">({snap})</span>'
                         f'<pre class="chunk-pre">{snippet}</pre></div>'
                     )
                 chunk_dbg_html = (
                     f'<details class="chunk-toggle">'
-                    f'<summary>{len(dbg_chunks)} chunk(s) retrieved</summary>'
+                    f'<summary>{len(ans_chunks)} chunk(s) fed to LLM</summary>'
                     f'<div class="chunk-body">{"".join(cp)}</div>'
                     f'</details>'
                 )
@@ -279,7 +278,7 @@ for row_num, qid in enumerate(all_ids, 1):
         f'<td class="score-col wip-col" data-run="wip"{highlight}>{wsc_str}</td>'
     )
 
-    rows_html += f'<tr>{td_meta}{td_runs}{td_wip}</tr>\n'
+    rows_html += f'<tr>{td_meta}{td_runs}{td_wip}<td class="num-col">{row_num}</td></tr>\n'
 
 # WIP projected qa_score
 wip_proj = (wip_weighted_score / wip_total_weight) if wip_total_weight > 0 and HAS_WIP else None
@@ -343,12 +342,12 @@ wip_avg_cell = (
 
 rows_html += (
     f'<tr class="avg-row">'
-    f'<td class="num-col avg-cell"></td>'
     f'<td class="snap-col avg-cell"></td>'
     f'<td class="wt-col avg-cell"></td>'
     f'<td class="cat-col avg-cell"></td>'
     f'<td class="q-col avg-cell" colspan="3">Summary (from report.json)</td>'
     f'{avg_cells}{wip_avg_cell}'
+    f'<td class="num-col avg-cell"></td>'
     f'</tr>\n'
 )
 
@@ -423,6 +422,16 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 <body>
 <h1>Eval Run Comparison</h1>
 <p class="sub">{RUN_COLS} run(s) · {len(all_ids)} questions</p>
+<details class="regression-notes" style="margin-bottom:12px;border:1px solid #fca5a5;border-radius:6px;padding:8px 12px;background:#fff1f2">
+  <summary style="cursor:pointer;font-size:0.78rem;color:#dc2626;font-weight:600">⚠ Known regressions — do not repeat</summary>
+  <div style="margin-top:8px;font-size:0.78rem;line-height:1.6">
+    <b>1. dup-009 &amp; dup-049 (run 29)</b> — Both dropped to 0.0 due to LLM nondeterminism noise, not a code change.
+    No code fix attempted; re-runs sometimes recover. Do not introduce retrieval or prompt changes targeting these rows without clear evidence of a systematic failure.
+    <br><br>
+    <b>2. Row 39 / cust-001 — <code>_inject_credit_rate_chunks</code> (run 30 scope creep)</b> — Adding a post-retrieval chunk injection step that was NOT listed in the Temporal RAG proposals caused this row to regress 1.00→0.00.
+    It was reverted. Rule: implement ONLY changes from the proposals list; stop and propose before adding anything extra.
+  </div>
+</details>
 <div class="run-filter">
   <button onclick="showAll()">All</button>
   <button onclick="showLatest()">Latest only</button>
@@ -433,7 +442,6 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 <table>
 <thead>
   <tr>
-    <th class="num-col" id="num-th" onclick="sortByNum()" style="cursor:pointer" title="Sort by row number">#</th>
     <th class="snap-col">snapshot</th>
     <th class="wt-col" id="wt-th" onclick="sortByWt()" style="cursor:pointer" title="Sort by weight">wt</th>
     <th class="cat-col">category</th>
@@ -442,6 +450,7 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
     <th class="must-col">must_include</th>
     {header_cells}
     {wip_header}
+    <th class="num-col" id="num-th" onclick="sortByNum()" style="cursor:pointer" title="Sort by row number">#</th>
   </tr>
 </thead>
 <tbody>
