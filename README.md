@@ -8,6 +8,7 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ## Contents
 
+- [Current eval status](#current-eval-status)
 - [Artifacts](#artifacts)
 - [Approaches considered and skipped](#approaches-considered-and-skipped)
 - [Eval run log](#eval-run-log)
@@ -20,6 +21,20 @@ Conflict detection compares percentage values across snapshot dates for the same
 - [Stack](#stack)
 - [Repo policy](#repo-policy)
 - [Development history](#development-history)
+
+---
+
+## Current eval status
+
+Latest run: `run_2026-11-08_22-06-45_custom` · 56 questions (40 public + 16 custom)
+
+| Subset | Score 1.0 | Score 0.85 | Score 0.50 | Score 0.0 | qa\_score | final\_score |
+|---|---|---|---|---|---|---|
+| 40 public (dup-\*) | 32 | 2 | 1 | 5 | 0.8434 | 0.8346 |
+| 16 custom (cust-\*) | 10 | — | 2 | 4 | 0.6538 | — |
+| **56 total** | **42** | **2** | **3** | **9** | **0.7994** | **0.7911** |
+
+Consistency: 1.00 · Speed: 0.94
 
 ---
 
