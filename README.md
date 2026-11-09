@@ -12,8 +12,6 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 **[Temporal RAG proposals](https://claude.ai/artifact/XrKATgNjQfbsneEgU984y8)** — proposal table with trade-offs, applied status, and failing-row breakdown
 
-_(private links — share via each artifact's Share menu to make public)_
-
 ---
 
 ## Approaches considered and skipped
