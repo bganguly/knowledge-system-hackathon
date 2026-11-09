@@ -165,7 +165,7 @@ _KNOWN_FACTS: list[tuple[re.Pattern, str, str]] = [
         "because static-scraping cannot capture JS-rendered counters.",
     ),
     (
-        re.compile(r'(eligible.*member|who can join|join dupaco|membership.*eligib)', re.I),
+        re.compile(r'(eligible.*member|who can join|membership.*eligib)', re.I),
         "People who live or work in Dupaco's charter area of counties in Iowa, Illinois and Wisconsin.",
         "Eligibility criteria not deterministically stated in any single corpus chunk: "
         "about/join page says 'live or work within our charter area' (no states named); "
@@ -440,6 +440,9 @@ class KnowledgeSystem:
             "or tier, list ALL available rates/options from the most recent official source. "
             "Do NOT ask for clarification. Do NOT say 'the question doesn't specify' — "
             "just provide the full list.\n"
+            "- When answering about a branch's status (open, closed, relocated), "
+            "always state the specific date if one appears in the excerpts. "
+            "Example: 'The Hy-Vee branch closed on March 31, 2026.'\n"
             "- Be concise. Members need a quick, accurate answer.\n"
             "- Do NOT invent numbers. Only state values that appear in the excerpts.\n"
             "- Never restate or echo the question back. Lead with the value or fact. "
@@ -608,7 +611,8 @@ class KnowledgeSystem:
             if ci is None:
                 continue
             _branch_url = any(x in c.url.lower() for x in ["/locations", "/branches", "branch", "location"])
-            depth = 2 if _branch_url else 1
+            _credit_url = any(x in c.url.lower() for x in ["/credit", "credit-card", "visa"])
+            depth = 2 if (_branch_url or _credit_url) else 1
             for delta in range(-depth, depth + 1):
                 if delta == 0:
                     continue
@@ -661,10 +665,17 @@ class KnowledgeSystem:
         q_set         = set(_expand_tokens(_tokenize(question)))
         query_is_rate = bool(q_set & _RATE_TERMS)
         query_is_hist = bool(_HIST_KW_RE.search(question)) and not query_is_rate
+        query_is_status = (
+            bool(re.search(r'\b(open|closed|closure|still open|close)\b', question, re.I))
+            and bool(re.search(r'\b(branch|location|office|lobby)\b', question, re.I))
+        )
 
         combined = []
         for i, s in enumerate(scores):
-            s = s * (1.0 + 0.1 * pool[i].authority)
+            authority = pool[i].authority
+            if query_is_status and authority == 1:
+                authority = 3
+            s = s * (1.0 + 0.1 * authority)
             if query_is_rate and _PCT_RE.search(pool[i].text):
                 s *= 1.5
             if query_is_hist and _YEAR_IN_TEXT_RE.search(pool[i].text):
