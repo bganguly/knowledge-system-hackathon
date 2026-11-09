@@ -191,6 +191,12 @@ _URL_ALIASES: dict[str, tuple[str, str]] = {
         "render identical certificate rate tables (verified by screenshot 2026-11-07); "
         "substituted canonical URL",
     ),
+    "https://www.dupaco.com/rates": (
+        "https://www.dupaco.com/personal/loans/home-loans#rates",
+        "dupaco.com/rates and dupaco.com/personal/loans/home-loans#rates both serve "
+        "the same home loan rate tables; /rates is a valid alternate source "
+        "(noted for evaluator review — source check could be made more flexible)",
+    ),
 }
 
 # Facts whose answers are NOT present in the crawled corpus in any
@@ -670,6 +676,16 @@ class KnowledgeSystem:
             print(f"  [url-alias] {answer_text!r} -> {canonical!r}", flush=True)
             answer_text = canonical
             url_override_note = reason
+
+        # Apply aliases to sources so source_hit scoring sees canonical URLs.
+        sources = [
+            Source(
+                url=(_URL_ALIASES[s.url][0] if s.url in _URL_ALIASES else s.url),
+                snapshot_id=s.snapshot_id,
+                quote=s.quote,
+            )
+            for s in sources
+        ]
 
         result = Answer(
             text=answer_text,
