@@ -11,7 +11,7 @@ Conflict detection compares percentage values across snapshot dates for the same
 - [Current eval status](#current-eval-status)
 - [Artifacts](#artifacts)
 - [Approaches considered and skipped](#approaches-considered-and-skipped)
-- [Eval run log](#eval-run-log)
+- [Sample eval run log](#sample-eval-run-log)
 - [Manual score overrides](#manual-score-overrides)
 - [Custom eval](#custom-eval-5-questions--2026-11-07)
 - [40-public vs 45-cumulative](#40-public-vs-45-cumulative-run-2026-11-07-0104)
@@ -26,7 +26,7 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ## Current eval status
 
-Latest run: `run_2026-11-08_22-06-45_custom` · 56 questions (40 public + 16 custom)
+Latest run: `run_2026-11-08_22-06-45_custom` · 56 questions (40 provided + 16 custom)
 
 | Subset | Score 1.0 | Score 0.85 | Score 0.50 | Score 0.0 | qa\_score | final\_score |
 |---|---|---|---|---|---|---|
@@ -34,7 +34,7 @@ Latest run: `run_2026-11-08_22-06-45_custom` · 56 questions (40 public + 16 cus
 | 16 custom | 10 | 0 | 2 | 4 | 0.6538 | 0.6470 |
 | **56 total** | **42** | **2** | **3** | **9** | **0.7994** | **0.7911** |
 
-Consistency: 1.00 · Speed: 0.94
+Consistency: 1.00 · Speed: 0.94 (p95 3.1s)
 
 ---
 
@@ -57,7 +57,7 @@ Consistency: 1.00 · Speed: 0.94
 
 ---
 
-## Eval run log
+## Sample eval run log
 
 | | 2026-11-05 22:52:16 | 2026-11-06 22:31:25 | 2026-11-06 22:49:34 | 2026-11-06 22:59:32 | 2026-11-06 23:18:47 |
 |---|---|---|---|---|---|
