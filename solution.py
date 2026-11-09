@@ -61,6 +61,12 @@ import anthropic  # noqa: E402
 
 _WORD_RE = re.compile(r"[a-z0-9$%.]+")
 _PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
+_LOAN_TERM_RE = re.compile(r'\b(\d+)[- ]?years?\b', re.IGNORECASE)
+
+
+def _normalize_loan_query(text: str) -> str:
+    """Convert 'N year(s)' loan terms to equivalent months so BM25 hits rate-table chunks."""
+    return _LOAN_TERM_RE.sub(lambda m: f"{int(m.group(1)) * 12} months", text)
 _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
 _TOP_K     = 22           # chunks fed to the LLM
@@ -115,6 +121,17 @@ _STEM_EXPAND: dict[str, list[str]] = {
     "wallet": ["apple", "pay", "google", "samsung"],
     # Founder/history synonyms — "who founded" should match about/history chunks
     "founder": ["employees", "meatpacking", "started", "history"],
+    # Loan term months plural/singular
+    "months": ["month"],
+    "month": ["months"],
+    # Vehicle model year range expansion — maps a query year to the range-boundary tokens
+    # that appear in rate-table chunks ("2017-20 Model Year" → tokens "2017","20" etc.)
+    "2018": ["2017", "2020"],
+    "2019": ["2017", "2020"],
+    "2020": ["2017"],
+    "2022": ["2021"],
+    "2024": ["2023", "2026"],
+    "2025": ["2023", "2026"],
 }
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
@@ -609,7 +626,7 @@ class KnowledgeSystem:
         return self._retrieve_bm25(question, pool)
 
     def _retrieve_bm25(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
-        q_tokens = _expand_tokens(_tokenize(question))
+        q_tokens = _expand_tokens(_tokenize(_normalize_loan_query(question)))
 
         if _HAS_BM25:
             tokens = [_tokenize(c.title + " " + c.text) for c in pool]
@@ -671,7 +688,7 @@ class KnowledgeSystem:
         return self._apply_boosts_and_cap(question, pool, scores.tolist())
 
     def _retrieve_hybrid(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
-        q_tokens = _expand_tokens(_tokenize(question))
+        q_tokens = _expand_tokens(_tokenize(_normalize_loan_query(question)))
         tokens   = [_tokenize(c.title + " " + c.text) for c in pool]
         bm25     = BM25Okapi(tokens)
         bm25_raw = bm25.get_scores(q_tokens)
@@ -690,7 +707,7 @@ class KnowledgeSystem:
     def _apply_boosts_and_cap(
         self, question: str, pool: list[_Chunk], scores: list[float]
     ) -> list[_Chunk]:
-        q_set         = set(_expand_tokens(_tokenize(question)))
+        q_set         = set(_expand_tokens(_tokenize(_normalize_loan_query(question))))
         query_is_rate = bool(q_set & _RATE_TERMS)
         query_is_hist = bool(_HIST_KW_RE.search(question)) and not query_is_rate
         query_is_status = (
