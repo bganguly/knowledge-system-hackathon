@@ -6,6 +6,23 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ---
 
+## Contents
+
+- [Artifacts](#artifacts)
+- [Approaches considered and skipped](#approaches-considered-and-skipped)
+- [Eval run log](#eval-run-log)
+- [Manual score overrides](#manual-score-overrides)
+- [Custom eval](#custom-eval-5-questions--2026-11-07)
+- [40-public vs 45-cumulative](#40-public-vs-45-cumulative-run-2026-11-07-0104)
+- [How it works](#how-it-works)
+- [Setup](#setup-first-time)
+- [Running the eval](#running-the-eval)
+- [Stack](#stack)
+- [Repo policy](#repo-policy)
+- [Development history](#development-history)
+
+---
+
 ## Artifacts
 
 **[Eval run comparison](https://claude.ai/artifact/JgfuQECziuJbVYfsPmMQY6)** — per-question drill-down across all runs (answer · score · judge · BM25 chunks)
