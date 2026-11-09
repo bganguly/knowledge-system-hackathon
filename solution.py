@@ -127,8 +127,10 @@ _STEM_EXPAND: dict[str, list[str]] = {
     "grant": ["fhlb", "home$tart", "homebuyer", "assistance"],
     "homebuyer": ["home$tart", "fhlb", "grant", "first-time"],
     # Mortgage synonyms — "mortgage rates" should score home-loan rate table rows
+    # Bidirectional: "mortgage" query → "conventional" chunks; "conventional" docs → "mortgage" query term
     "mortgage": ["home", "loan", "purchase", "refinance", "conventional"],
     "mortgages": ["home", "loan", "purchase", "refinance", "conventional"],
+    "conventional": ["mortgage", "home", "loan"],  # rate rows use "conventional"; must match "mortgage" queries
     # Auto loan synonyms — "2025 vehicle" should match "2024-27 Model Year"
     "vehicle": ["auto", "car", "automobile"],
     "vehicles": ["auto", "car", "automobile"],
@@ -319,6 +321,8 @@ class KnowledgeSystem:
     # ------------------------------------------------------------------
 
     def _load_gold_cache(self) -> dict[str, dict]:
+        if not os.environ.get("USE_GOLD_CACHE"):
+            return {}
         if not _GOLD_CACHE_PATH.exists():
             return {}
         cutoff = datetime.date.today() - datetime.timedelta(days=_GOLD_CACHE_TTL_DAYS)
