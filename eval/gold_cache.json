@@ -813,5 +813,95 @@
       }
     ],
     "ts": "2026-11-09"
+  },
+  "What are Dupaco's general lobby hours?||None": {
+    "text": "The most recent official general lobby hours are Monday\u2013Friday: 8:30 a.m.\u20135:30 p.m., and Saturday: 8:30 a.m.\u201312:30 p.m.",
+    "sources": [
+      {
+        "url": "https://www.dupaco.com/newsroom/dupaco-community-credit-union-celebrates-completion-of-newest-learning-lab",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/newsroom/dupaco-community-credit-union-celebrates-completion-of-newest-learning-lab-2",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/contact",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/about/what-is-dupaco/our-impact/",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/community",
+        "snapshot_id": "05_2026-09-28_latest"
+      }
+    ],
+    "ts": "2026-11-09"
+  },
+  "Is the Hy-Vee branch still open today (October 2026)?||None": {
+    "text": "The Hy-Vee branch closed on March 31, 2026.",
+    "sources": [
+      {
+        "url": "https://www.dupaco.com/newsroom/dupaco-evolves-with-purpose-and-member-needs-plans-hy-vee-branch-closure",
+        "snapshot_id": "05_2026-09-28_latest"
+      }
+    ],
+    "ts": "2026-11-09"
+  },
+  "Do any Dupaco savings tiers pay 0.35% APY?||None": {
+    "text": "No. The Share Savings tiers pay 0.00%, 0.10%, 0.15%, and 0.20% APY, so the highest is 0.20% APY at a $25,000+ balance.",
+    "sources": [
+      {
+        "url": "https://www.dupaco.com/rates",
+        "snapshot_id": "05_2026-09-28_latest"
+      }
+    ],
+    "ts": "2026-11-09"
+  },
+  "What is Dupaco's Home$tart program?||None": {
+    "text": "The Home$tart program is a partnership between Dupaco and the Federal Home Loan Bank (FHLB) of Des Moines that helps first-time homebuyers with down payment and closing costs. It provides up to $15,000 in assistance, applied as a credit toward down payment and closing costs for eligible buyers.",
+    "sources": [
+      {
+        "url": "https://www.dupaco.com/newsroom/first-time-homebuyers-get-a-boost-dupaco-offers-fhlb-hometart-grants",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/hubfs/Downloadables/Personal/Dupaco-Rewards-Visa-Terms-Conditions.pdf",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/business/resources/whens-the-best-time-to-write-a-business-plan-dupaco",
+        "snapshot_id": "05_2026-09-28_latest"
+      }
+    ],
+    "ts": "2026-11-09"
+  },
+  "What recognition has Dupaco received from Forbes?||None": {
+    "text": "Dupaco has received Forbes recognition in three categories: Forbes Best-in-State Credit Union (ranked third in Iowa among six credit unions, in the fifth time Forbes recognized Dupaco), Forbes America's Best Small Employer (ranked #61 overall and #11 in banking and financial), and it was recognized as a top small employer in America for the second time in a month.",
+    "sources": [
+      {
+        "url": "https://www.dupaco.com/newsroom/forbes-ranks-dupaco-a-top-small-employer-in-america",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/newsroom/dupaco-credit-union-named-a-2023-iowa-top-workplace",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/newsroom/forbes-ranks-dupaco-as-a-top-credit-union-in-america-3",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/newsroom/u-s-small-business-administration-recognizes-dupaco-as-top-paycheck-protection-program-lender",
+        "snapshot_id": "05_2026-09-28_latest"
+      },
+      {
+        "url": "https://www.dupaco.com/business/resources/dupaco-helps-small-businesses-weather-covid-with-ppp-loans",
+        "snapshot_id": "05_2026-09-28_latest"
+      }
+    ],
+    "ts": "2026-11-09"
   }
 }
