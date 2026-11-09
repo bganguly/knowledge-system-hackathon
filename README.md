@@ -6,11 +6,13 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ---
 
-## Eval run comparison
+## Artifacts
 
-Per-question drill-down across all 19 runs (answer · score · judge · BM25 chunks):
-**[comparison report](https://claude.ai/artifact/JgfuQECziuJbVYfsPmMQY6)**
-_(private link — share via the artifact's Share menu to make public)_
+**[Eval run comparison](https://claude.ai/artifact/JgfuQECziuJbVYfsPmMQY6)** — per-question drill-down across all runs (answer · score · judge · BM25 chunks)
+
+**[Temporal RAG proposals](https://claude.ai/artifact/XrKATgNjQfbsneEgU984y8)** — proposal table with trade-offs, applied status, and failing-row breakdown
+
+_(private links — share via each artifact's Share menu to make public)_
 
 ---
 
