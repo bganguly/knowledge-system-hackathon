@@ -114,14 +114,14 @@ _ensure_snapshots
 # ── Dispatch ──────────────────────────────────────────────────────────────────
 _select_model() {
   DEFAULT_MODEL="${LLM_MODEL:-claude-haiku-5-5}"
-  read -r -p "Switch model? (current: $DEFAULT_MODEL) [y/N] " _switch
+  read -r -p "Switch model? (current: $DEFAULT_MODEL) [y/N] " _switch || true
   _switch="${_switch:-N}"
   if [[ "$_switch" =~ ^[Yy]$ ]]; then
     echo "  1) claude-haiku-5-5    — Anthropic  (fast, cheap)"
     echo "  2) claude-sonnet-5-5   — Anthropic  (balanced, latest)"
     echo "  3) claude-opus-5-5     — Anthropic  (most capable)"
     echo "  4) claude-sonnet-4-5   — Anthropic  (stable sonnet)"
-    read -r -p "  Pick [1-4] or type a model ID: " _pick
+    read -r -p "  Pick [1-4] or type a model ID: " _pick || true
     case "$_pick" in
       1) export LLM_MODEL="claude-haiku-5-5" ;;
       2) export LLM_MODEL="claude-sonnet-5-5" ;;
