@@ -8,16 +8,15 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 ## Contents
 
+- [Setup](#setup-first-time)
+- [Running the eval](#running-the-eval)
 - [Current eval status](#current-eval-status)
 - [Artifacts](#artifacts)
 - [Approaches considered and skipped](#approaches-considered-and-skipped)
 - [Sample eval run log](#sample-eval-run-log)
 - [Manual score overrides](#manual-score-overrides)
-- [Custom eval](#custom-eval-16-questions)
-- [40-public vs 45-cumulative](#40-public-vs-45-cumulative-run-2026-11-07-0104)
+- [Sample custom eval](#sample-custom-eval)
 - [How it works](#how-it-works)
-- [Setup](#setup-first-time)
-- [Running the eval](#running-the-eval)
 - [Stack](#stack)
 - [Repo policy](#repo-policy)
 - [Development history](#development-history)
@@ -87,9 +86,9 @@ Overrides are stored in `results/per_question.jsonl` under the `_override` field
 
 ---
 
-## Custom eval (16 questions)
+## Sample custom eval
 
-16 questions written against facts verifiable in the snapshot markdown files.
+Sample of 5 of 16 questions written against facts verifiable in the snapshot markdown files.
 
 | # | Question | Expected answer | Must include |
 |---|---|---|---|
@@ -98,35 +97,6 @@ Overrides are stored in `results/per_question.jsonl` under the `_override` field
 | 3 | What is the minimum deposit required to open a primary Dupaco membership? | The minimum deposit to open a primary Dupaco membership share is $25. | 25 |
 | 4 | What year did Dupaco first introduce its Holiday Club savings account? | Dupaco's Holiday Club savings account was created in 1954. | 1954 |
 | 5 | What APY does the Launchpad Savings account offer? | The Launchpad Savings account pays 3.25% APY on balances from $5 to $1,000. | 3.25 |
-| 6 | How many Dupaco employees used Volunteer Time Off in year before last? | 256 employees used Volunteer Time Off (VTO) in 2024. | 256 |
-| 7 | What is the largest small business loan available at Dupaco? | Dupaco's small business loan covers financing needs up to $50,000. | 50,000 |
-| 8 | What business credit cards do you offer and what are their APRs? | Dupaco offers the Business Platinum Visa at 15.5% APR and the Business Rewards Visa at 20.5% APR. | Business Platinum, Business Rewards, 15.5, 20.5 |
-| 9 | Was the Hy-Vee branch open January of this year? | The Hy-Vee branch was open in January 2026; it closed on March 31, 2026. | March 31, 2026 |
-| 10 | Give me details on Investor's Choice. | $2,500 minimum to open and no limit on your balance. | 2,500, 250,000 |
-| 11 | Who is eligible to join? | You live or work within our charter area. You have an immediate family member who's a member. You belong to the Rural Ideas Network. | https://www.ruralideas.net/partner-pages/dupaco-credit-union |
-| 12 | Is Asbury branch open now? | No. | no |
-| 13 | Any college scholarships? | Dupaco Foundation renewal college scholarship program. | 60,000 |
-| 14 | Loan rates on 2019 model motorcycle for 5 year. | 6.49% APR. | 6.49 |
-| 15 | Loan rates on 2019 model motorcycle for 3 year. | Unable to answer. | — |
-| 16 | Loan rates on 2019 model motorcycle for 5 year as of May. | 6.14% APR. | 6.14 |
-
----
-
-## 40-public vs 45-cumulative (run 2026-11-07 01:04)
-
-Both columns are from the same eval run (`run_2026-11-07_01-04-09_custom.jsonl`). The 40-only column is the public subset extracted from that run; no separate run was executed.
-
-| | 40 public (subset) | 45 combined (cumulative) |
-|---|---|---|
-| questions | 40 | 45 |
-| qa_score (weighted) | 0.7671 | **0.7782** |
-| pass | 28 | 33 |
-| partial | 5 | 6 |
-| fail | 7 | 6 |
-| p95 latency | 2.27s | 2.27s |
-| final_score | — | **0.7702** |
-
-`final_score` is computed by the harness over the full 45-question run only (consistency and speed pillars span all questions and cannot be split cleanly by subset).
 
 ---
 
@@ -164,8 +134,6 @@ python harness/run_eval.py \
   --submission /path/to/knowledge-system-hackathon \
   --eval eval/public_eval.jsonl
 ```
-
-Snapshots are unpacked automatically on first run. Results land in `results/` inside the kit directory.
 
 **Repeated local use** — `deploy.sh` wraps the above, handles snapshot extraction, and loads the key from `.env` if not already set. It defaults to `../hackathon-knowledge-kit-participant` (sibling folder); pass a path to override. Second arg overrides the model:
 
@@ -219,4 +187,5 @@ Snapshot data is from a real credit union and must not be committed. `.gitignore
 - [ ] **If lever 3 helps, consider lever 4** (prompt fix): add explicit instruction "when a dollar amount appears in the excerpts, state it directly" — applies to other rows that answer with vague ranges instead of the number
 - [ ] **Remove hybrid pathway from `solution.py` and `deploy.sh`**: `--retrieve dense/hybrid` options in `deploy.sh` still reference the old dense path; `solution.py` still has the hybrid branch. Remove once BM25 fine-tuning is settled
 - [ ] **Run full eval once BM25 fine-tuning is done**: `./scripts/deploy.sh --eval` to record the final baseline after levers 1+2 (and optionally 3+4)
-- [ ] **Chunk inspection workbench** (`chunk-workbench/`): manually examine the top-22 BM25 chunks being sent to the LLM for each failing/partial question. Use `./chunk-workbench/scripts/run_chunks.sh` (no LLM calls, no API key needed). Params `--top-k`, `--max-per-url`, `--max-chunk`, `--questions` let you iterate on retrieval strategy. Output is a JSONL + a visual HTML artifact (drag-and-drop the JSONL) that shows rank · URL · authority · text for each chunk side-by-side across runs. Goal: understand what the LLM sees for the ~1/3 questions we're currently getting wrong and tune chunking without paying for LLM calls.
+- [ ] **Remove chunk inspection workbench** (`chunk-workbench/`): no longer needed once BM25 tuning is settled
+- [ ] **Provide unit tests**: add tests for retrieval, chunking, and temporal filtering logic
