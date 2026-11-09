@@ -370,8 +370,10 @@ class KnowledgeSystem:
                 cut = md.rfind('\n\n', 0, _hfy.start())
                 md = md[:cut] if cut >= 0 else md[:_hfy.start()]
             paras = _join_short_paras(
-                [p.strip() for p in md.split("\n\n")
-                 if p.strip() and not _SKIP_PARA_RE.match(p.strip())]
+                _merge_schedule_blocks(
+                    [p.strip() for p in md.split("\n\n")
+                     if p.strip() and not _SKIP_PARA_RE.match(p.strip())]
+                )
             )
             seen_in_page: set[str] = set()
             for para in paras:
@@ -931,6 +933,49 @@ def _expand_tokens(tokens: list[str]) -> list[str]:
             if singular not in tokens:
                 extra.append(singular)
     return tokens + extra
+
+
+_SCHEDULE_LINE_RE = re.compile(
+    r'\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b'
+    r'.*?(\d{1,2}:\d{2}\s*[ap]\.m\.|noon|midnight|closed|ATM)',
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _merge_schedule_blocks(paras: list[str]) -> list[str]:
+    """Merge consecutive day/time schedule lines into one paragraph.
+
+    Blank lines between schedule rows in source HTML cause each line to become
+    its own paragraph; without this merge, 'noon' (Saturday) ends up in a chunk
+    that has no 'Lobby' context, making BM25 unable to surface it for hour queries.
+
+    Only fires when a paragraph contains both a day name and a time/status token
+    (8:30 a.m., noon, closed, ATM) — narrow enough to avoid false positives on
+    news articles or rate tables.
+    """
+    def _is_schedule(p: str) -> bool:
+        return bool(_SCHEDULE_LINE_RE.search(p))
+
+    result: list[str] = []
+    i = 0
+    while i < len(paras):
+        p = paras[i]
+        if _is_schedule(p):
+            group = [p]
+            j = i + 1
+            while j < len(paras) and _is_schedule(paras[j]):
+                group.append(paras[j])
+                j += 1
+            if result and not _is_schedule(result[-1]):
+                header = result.pop()
+                result.append(header + "\n" + "\n".join(group))
+            else:
+                result.append("\n".join(group))
+            i = j
+        else:
+            result.append(p)
+            i += 1
+    return result
 
 
 def _join_short_paras(paras: list[str], threshold: int = 80) -> list[str]:
