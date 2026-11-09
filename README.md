@@ -30,8 +30,8 @@ Latest run: `run_2026-11-08_22-06-45_custom` · 56 questions (40 public + 16 cus
 
 | Subset | Score 1.0 | Score 0.85 | Score 0.50 | Score 0.0 | qa\_score | final\_score |
 |---|---|---|---|---|---|---|
-| 40 public (dup-\*) | 32 | 2 | 1 | 5 | 0.8434 | 0.8346 |
-| 16 custom (cust-\*) | 10 | — | 2 | 4 | 0.6538 | — |
+| 40 provided | 32 | 2 | 1 | 5 | 0.8434 | 0.8346 |
+| 16 custom | 10 | 0 | 2 | 4 | 0.6538 | 0.6470 |
 | **56 total** | **42** | **2** | **3** | **9** | **0.7994** | **0.7911** |
 
 Consistency: 1.00 · Speed: 0.94
