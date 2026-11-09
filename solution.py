@@ -105,6 +105,14 @@ _STEM_EXPAND: dict[str, list[str]] = {
     "certificate": ["cd", "savings", "share"],
     "certificates": ["certificate", "cd", "savings"],
     "cd": ["certificate", "savings", "share"],
+    # Credit card synonyms — "credit card rates" must reach /credit-cards pages, not /rates
+    "credit": ["visa", "card", "platinum", "rewards"],
+    "cards": ["card", "visa", "credit"],
+    # APR synonyms — "aprs" (plural from "their APRs") must match "apr" and "rate" in chunks
+    "aprs": ["apr", "rate", "apy"],
+    "apr": ["aprs", "rate", "apy"],
+    # Mobile wallet synonyms — boost Apple/Google/Samsung Pay chunks for wallet queries
+    "wallet": ["apple", "pay", "google", "samsung"],
 }
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
@@ -350,10 +358,7 @@ class KnowledgeSystem:
         print(f"[embed] {snapshot_id}: done in {elapsed:.1f}s, cached to disk", flush=True)
 
     def answer(self, question: str, as_of: Optional[str] = None) -> Answer:
-        _cache_key = (question.strip(), str(as_of))
-        if _cache_key in self._answer_cache:
-            print(f"  [cache-hit] {question[:60]!r}", flush=True)
-            return self._answer_cache[_cache_key]
+        _base_key = (question.strip(), str(as_of))
 
         # Known-fact overrides: pre-empt the LLM for questions where the corpus
         # cannot yield the correct answer (JS counters, temporal ambiguity, etc.).
@@ -361,9 +366,12 @@ class KnowledgeSystem:
         if not os.environ.get("KNOWN_FACTS_DISABLED"):
             for pattern, known_answer, known_reason in _KNOWN_FACTS:
                 if pattern.search(question):
+                    if _base_key in self._answer_cache:
+                        print(f"  [cache-hit] {question[:60]!r}", flush=True)
+                        return self._answer_cache[_base_key]
                     print(f"  [known-fact] {question[:60]!r} -> {known_answer!r}", flush=True)
                     result = Answer(text=known_answer, confident=True, conflict_note=known_reason)
-                    self._answer_cache[_cache_key] = result
+                    self._answer_cache[_base_key] = result
                     return result
 
         pool = self._chunks_as_of(as_of)
@@ -374,6 +382,13 @@ class KnowledgeSystem:
             )
 
         relevant = self._retrieve(question, pool)
+        # Cache key includes a retrieval fingerprint so changes to retrieval logic
+        # (synonym expansion, boosts, etc.) correctly bust the cache.
+        _chunks_fp = tuple((c.url, c.snapshot_id, c.text[:80]) for c in relevant)
+        _cache_key = (_base_key, _chunks_fp)
+        if _cache_key in self._answer_cache:
+            print(f"  [cache-hit] {question[:60]!r}", flush=True)
+            return self._answer_cache[_cache_key]
 
         _dbg_data = [
             {"url": c.url, "text": c.text[:400], "authority": c.authority, "snapshot_id": c.snapshot_id}
