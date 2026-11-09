@@ -114,14 +114,7 @@ _STEM_EXPAND: dict[str, list[str]] = {
     # Mobile wallet synonyms — boost Apple/Google/Samsung Pay chunks for wallet queries
     "wallet": ["apple", "pay", "google", "samsung"],
     # Founder/history synonyms — "who founded" should match about/history chunks
-    "founder": ["employees", "meatpacking", "started", "history", "ten", "original"],
-    # Closure synonyms — "is Hy-Vee branch still open" should reach closure-date chunks
-    "close": ["closed", "closure", "last day", "relocat"],
-    "closed": ["close", "closure", "last day", "march"],
-    # Home$tart synonyms — "home$tart program" should match grant/assistance chunks
-    "home": ["home$tart", "homestart", "homebuyer", "fhlb"],
-    "homestart": ["home$tart", "grant", "fhlb", "15000", "assistance"],
-    "program": ["home$tart", "grant", "homebuyer", "fhlb"],
+    "founder": ["employees", "meatpacking", "started", "history"],
 }
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
@@ -469,21 +462,12 @@ class KnowledgeSystem:
             "- If asked generically about a product category (e.g. 'what checking accounts "
             "does Dupaco offer', 'what savings products'), enumerate ALL named product "
             "variants found in the excerpts. Never return just one variant when multiple exist.\n"
-            "- When citing an award or ranking (e.g. Forbes, Best-in-State), always "
-            "include the specific rank ordinal or placement (e.g. 'fifth', 'No. 1') "
-            "if it appears in the excerpts. Do not omit the number.\n"
-            "- When asked for rates and the excerpts contain rate tables, list all "
-            "available rates from those tables. Never respond with a meta-comment "
-            "about the nature of the question or ask the member to clarify — "
-            "just list what the excerpts show.\n"
             "- When answering about a branch's status (open, closed, relocated), "
             "always state the specific date if one appears in the excerpts. "
             "Example: 'The Hy-Vee branch closed on March 31, 2026.'\n"
-            "- If the question names a specific branch or explicitly asks to compare "
-            "branches (e.g. 'do all branches keep the same hours'), list each branch's "
-            "schedule separately. For a generic hours question (e.g. 'what are your hours', "
-            "'what are your lobby hours'), give the most common schedule and add one sentence "
-            "noting that hours vary by location.\n"
+            "- If multiple branch-specific schedules appear in the excerpts "
+            "(e.g. different hours for different locations), list each branch's "
+            "hours separately — do not collapse to a single representative schedule.\n"
             "- Be concise. Members need a quick, accurate answer.\n"
             "- Do NOT invent numbers. Only state values that appear in the excerpts.\n"
             "- Never restate or echo the question back. Lead with the value or fact. "
