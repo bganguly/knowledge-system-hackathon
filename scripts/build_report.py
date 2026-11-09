@@ -278,7 +278,7 @@ for row_num, qid in enumerate(all_ids, 1):
         f'<td class="score-col wip-col" data-run="wip"{highlight}>{wsc_str}</td>'
     )
 
-    rows_html += f'<tr>{td_meta}{td_runs}{td_wip}<td class="num-col">{row_num}</td></tr>\n'
+    rows_html += f'<tr>{td_meta}{td_runs}<td class="num-col">{row_num}</td></tr>\n'
 
 # WIP projected qa_score
 wip_proj = (wip_weighted_score / wip_total_weight) if wip_total_weight > 0 and HAS_WIP else None
@@ -346,7 +346,7 @@ rows_html += (
     f'<td class="wt-col avg-cell"></td>'
     f'<td class="cat-col avg-cell"></td>'
     f'<td class="q-col avg-cell" colspan="3">Summary (from report.json)</td>'
-    f'{avg_cells}{wip_avg_cell}'
+    f'{avg_cells}'
     f'<td class="num-col avg-cell"></td>'
     f'</tr>\n'
 )
@@ -422,16 +422,6 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
 <body>
 <h1>Eval Run Comparison</h1>
 <p class="sub">{RUN_COLS} run(s) · {len(all_ids)} questions</p>
-<details class="regression-notes" style="margin-bottom:12px;border:1px solid #fca5a5;border-radius:6px;padding:8px 12px;background:#fff1f2">
-  <summary style="cursor:pointer;font-size:0.78rem;color:#dc2626;font-weight:600">⚠ Known regressions — do not repeat</summary>
-  <div style="margin-top:8px;font-size:0.78rem;line-height:1.6">
-    <b>1. dup-009 &amp; dup-049 (run 29)</b> — Both dropped to 0.0 due to LLM nondeterminism noise, not a code change.
-    No code fix attempted; re-runs sometimes recover. Do not introduce retrieval or prompt changes targeting these rows without clear evidence of a systematic failure.
-    <br><br>
-    <b>2. Row 39 / cust-001 — <code>_inject_credit_rate_chunks</code> (run 30 scope creep)</b> — Adding a post-retrieval chunk injection step that was NOT listed in the Temporal RAG proposals caused this row to regress 1.00→0.00.
-    It was reverted. Rule: implement ONLY changes from the proposals list; stop and propose before adding anything extra.
-  </div>
-</details>
 <div class="run-filter">
   <button onclick="showAll()">All</button>
   <button onclick="showLatest()">Latest only</button>
@@ -449,7 +439,6 @@ thead th {{ background: var(--code-bg); font-size: 0.72rem; text-transform: uppe
     <th>Expected Answer</th>
     <th class="must-col">must_include</th>
     {header_cells}
-    {wip_header}
     <th class="num-col" id="num-th" onclick="sortByNum()" style="cursor:pointer" title="Sort by row number">#</th>
   </tr>
 </thead>
