@@ -48,13 +48,18 @@ for rp in run_files:
                 questions[row["id"]] = row
     final_score = None
     qa_score = None
+    cons_score = None
+    speed_score = None
     rjson = report_files.get(ts)
     if rjson and Path(rjson).exists():
         with open(rjson) as f:
             rdata = json.load(f)
         final_score = rdata.get("final_score")
         qa_score = rdata.get("qa_score")
-    runs.append({"ts": display_ts, "questions": questions, "final_score": final_score, "qa_score": qa_score})
+        cons_score = (rdata.get("consistency") or {}).get("score")
+        speed_score = (rdata.get("speed") or {}).get("score")
+    runs.append({"ts": display_ts, "questions": questions, "final_score": final_score, "qa_score": qa_score,
+                 "cons_score": cons_score, "speed_score": speed_score})
 
 if not runs:
     print("No run files found in", RUNS_DIR)
@@ -323,8 +328,15 @@ for i, run in enumerate(runs):
         n_pub = len(pub_q)
         n_all = len(all_q)
         pqs_str = f"{pqs:.4f}" if pqs is not None else "—"
+        r_cons = run.get("cons_score")
+        r_spd = run.get("speed_score")
+        if pqs is not None and r_cons is not None and r_spd is not None:
+            pfs = pqs * (0.55 + r_cons * 0.15 + r_spd * 0.15) / 0.85
+            pfs_str = f"{pfs:.4f}"
+        else:
+            pfs_str = "—"
         inner = (
-            f'{n_pub}q &nbsp; qa: {pqs_str} &nbsp; final: — &nbsp;'
+            f'{n_pub}q &nbsp; qa: {pqs_str} &nbsp; final: {pfs_str} &nbsp;'
             f'&nbsp;|&nbsp; '
             f'{n_all}q &nbsp; qa: {qs_str} &nbsp; final: {fs_str}'
         )
