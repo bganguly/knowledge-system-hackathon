@@ -67,8 +67,8 @@ Consistency: 1.00 · Speed: p95=2.24s, score=0.9867
 
 ## Artifacts
 
-**[Eval run comparison](https://claude.ai/artifact/JgfuQECziuJbVYfsPmMQY6)** — per-question drill-down across all runs (answer · score · judge · BM25 chunks)
-**[Temporal RAG proposals](https://claude.ai/artifact/XrKATgNjQfbsneEgU984y8)** — proposal table with trade-offs, applied status, and failing-row breakdown
+**[Eval run comparison](https://claude.ai/artifact/JgfuQECziuJbVYfsPmMQY6)** — per-question drill-down across all runs (answer · score · judge · BM25 chunks)  
+**[Temporal RAG proposals](https://claude.ai/artifact/XrKATgNjQfbsneEgU984y8)** — proposal table with trade-offs, applied status, and failing-row breakdown  
 **[Ingest Review](https://claude.ai/artifact/Lutpuz5EnrmmZuKWBtjYQy)** — ingestion pipeline review
 
 ---
