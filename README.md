@@ -10,7 +10,7 @@ Conflict detection compares percentage values across snapshot dates for the same
 
 - [Setup](#setup-first-time)
 - [Running the eval](#running-the-eval)
-- [Current eval status](#current-eval-status)
+- [Latest eval stats](#latest-eval-stats)
 - [Artifacts](#artifacts)
 - [Approaches considered and skipped](#approaches-considered-and-skipped)
 - [Sample eval run log](#sample-eval-run-log)
@@ -51,17 +51,17 @@ python harness/run_eval.py \
 
 ---
 
-## Current eval status
+## Latest eval stats
 
-Latest run: `run_2026-11-09_11-21-33_custom` · 56 questions (40 provided + 16 custom)
+Latest run: `run_2026-11-09_21-17-02_custom` · 56 questions (40 provided + 16 custom)
 
 | Subset | Score 1.0 | Score 0.85 | Score 0.50 | Score 0.0 | qa\_score | final\_score |
 |---|---|---|---|---|---|---|
-| 40 provided | 33 | 2 | 1 | 4 | 0.8744 | 0.8724 |
-| 16 custom | 11 | 0 | 2 | 3 | 0.7500 | — |
-| **56 total** | **44** | **2** | **3** | **7** | **0.8411** | **0.8391** |
+| 40 provided | 35 | 2 | 1 | 2 | 0.9256 | 0.9175 |
+| 16 custom | 16 | 0 | 0 | 0 | 1.0000 | — |
+| **56 total** | **51** | **2** | **1** | **2** | **0.9429** | **0.9346** |
 
-Consistency: 1.00 · Speed: p95=2.24s, score=0.9867
+Consistency: 1.00 · Speed: p95=2.89s, score=0.9506
 
 ---
 
