@@ -28,12 +28,7 @@ Conflict detection compares percentage values across snapshot dates for the same
 ```bash
 pip install -r requirements.txt
 export ANTHROPIC_API_KEY=sk-ant-...
-```
-
-The LLM model defaults to `claude-haiku-5-5`. Override with the `LLM_MODEL` env var:
-
-```bash
-export LLM_MODEL=claude-sonnet-4-5
+export LLM_MODEL=claude-sonnet-4-5  # defaults to claude-haiku-5-5 if not set
 ```
 
 ## Running the eval
