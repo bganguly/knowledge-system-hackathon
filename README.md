@@ -172,7 +172,7 @@ A two-phase eval cache was partially implemented and then removed for time.  The
 - **`--fill-cache`** — after a successful eval, persist all score=1.0 answers to `eval/gold_cache.json` (keyed by `question||as_of`).
 - **`--use-cache`** (`USE_GOLD_CACHE=1`)  — subsequent eval reads from the cache instead of calling the LLM, allowing fast re-scoring after retrieval/prompt changes.
 
-The script `scripts/update_gold_cache.py` and the supporting `_load_gold_cache()` method in `solution.py` exist in git history (commit `c29a00c`) and can be restored when there is time to test the cache-miss/cache-hit paths end-to-end.
+The script `scripts/update_gold_cache.py` and the supporting `_load_gold_cache()` method in `solution.py` exist in git history (commit [`c29a00c`](https://github.com/bganguly/knowledge-system-hackathon/commit/c29a00c)) and can be restored when there is time to test the cache-miss/cache-hit paths end-to-end.
 
 ### TODOs (follow-up, no code changes needed now)
 
