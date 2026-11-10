@@ -58,7 +58,7 @@ Latest run: `run_2026-11-09_21-17-02_custom` · 56 questions (40 provided + 16 c
 | Subset | Score 1.0 | Score 0.85 | Score 0.50 | Score 0.0 | qa\_score | final\_score |
 |---|---|---|---|---|---|---|
 | 40 provided | 35 | 2 | 1 | 2 | 0.9256 | 0.9175 |
-| 16 custom | 16 | 0 | 0 | 0 | 1.0000 | — |
+| 16 custom | 16 | 0 | 0 | 0 | 1.0000 | 0.9898 |
 | **56 total** | **51** | **2** | **1** | **2** | **0.9429** | **0.9346** |
 
 Consistency: 1.00 · Speed: p95=2.89s, score=0.9506
