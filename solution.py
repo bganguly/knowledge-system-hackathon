@@ -169,15 +169,6 @@ _STEM_EXPAND: dict[str, list[str]] = {
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
 
-_MORTGAGE_QUERY_TERMS = {'mortgage', 'home loan', 'refinance', 'heloc', 'home equity'}
-_WEAK_CHUNK_STOPWORDS = {
-    'can', 'you', 'tell', 'me', 'the', 'a', 'an', 'is', 'are', 'was', 'were',
-    'what', 'how', 'when', 'where', 'who', 'which', 'any', 'all', 'some',
-    'please', 'give', 'us', 'i', 'my', 'your', 'do', 'does', 'did', 'for',
-    'of', 'in', 'on', 'at', 'to', 'with', 'by', 'from', 'as', 'into',
-    'that', 'this', 'these', 'those', 'it', 'its',
-}
-
 # URLs that are content-identical to a canonical URL confirmed by side-by-side
 # screenshot comparison (dupaco.com/rates#rates vs /personal/savings-account#rates
 # both render the same Special/Regular Certificate rate tables — 2026-11-07).
@@ -778,19 +769,10 @@ class KnowledgeSystem:
             return []
         mode = _RETRIEVAL_MODE
         if mode == "dense" and _HAS_ST:
-            chunks = self._retrieve_dense(question, pool)
-        elif mode == "hybrid" and _HAS_BM25 and _HAS_ST:
-            chunks = self._retrieve_hybrid(question, pool)
-        else:
-            chunks = self._retrieve_bm25(question, pool)
-        if _should_filter_weak_chunks(question):
-            before = len(chunks)
-            chunks = [c for c in chunks if _token_overlap(question, c.text) >= 2]
-            after = len(chunks)
-            if before != after:
-                print(f"  [mortgage-filter] dropped {before - after} weak chunks "
-                      f"({after} kept) for: {question[:60]!r}", flush=True)
-        return chunks
+            return self._retrieve_dense(question, pool)
+        if mode == "hybrid" and _HAS_BM25 and _HAS_ST:
+            return self._retrieve_hybrid(question, pool)
+        return self._retrieve_bm25(question, pool)
 
     def _retrieve_bm25(self, question: str, pool: list[_Chunk]) -> list[_Chunk]:
         # Health Savings / HSA chunks are only relevant when explicitly asked about.
@@ -984,17 +966,6 @@ class KnowledgeSystem:
 # ---------------------------------------------------------------------------
 # Module-level helpers
 # ---------------------------------------------------------------------------
-
-def _should_filter_weak_chunks(question: str) -> bool:
-    q = question.lower()
-    return any(t in q for t in _MORTGAGE_QUERY_TERMS)
-
-
-def _token_overlap(question: str, text: str) -> int:
-    tokens = set(re.findall(r'[a-z0-9]+', question.lower())) - _WEAK_CHUNK_STOPWORDS
-    tl = text.lower()
-    return sum(1 for t in tokens if t in tl)
-
 
 def _tokenize(text: str) -> list[str]:
     return _WORD_RE.findall(text.lower())
