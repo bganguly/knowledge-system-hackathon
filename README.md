@@ -14,7 +14,6 @@ Conflict detection compares percentage values across snapshot dates for the same
 - [Artifacts](#artifacts)
 - [Approaches considered and skipped](#approaches-considered-and-skipped)
 - [Sample eval run log](#sample-eval-run-log)
-- [Manual score overrides (optional)](#manual-score-overrides-optional)
 - [Sample custom eval](#sample-custom-eval)
 - [How it works](#how-it-works)
 - [Stack](#stack)
@@ -69,8 +68,8 @@ Consistency: 1.00 · Speed: p95=2.24s, score=0.9867
 ## Artifacts
 
 **[Eval run comparison](https://claude.ai/artifact/JgfuQECziuJbVYfsPmMQY6)** — per-question drill-down across all runs (answer · score · judge · BM25 chunks)
-
 **[Temporal RAG proposals](https://claude.ai/artifact/XrKATgNjQfbsneEgU984y8)** — proposal table with trade-offs, applied status, and failing-row breakdown
+**[Ingest Review](https://claude.ai/artifact/Lutpuz5EnrmmZuKWBtjYQy)** — ingestion pipeline review
 
 ---
 
@@ -102,16 +101,6 @@ Consistency: 1.00 · Speed: p95=2.24s, score=0.9867
 | final_score | **0.6812** | **0.6605** | **0.6132** | **0.6464** | **0.7157** |
 
 Adjacent chunk retrieval (top-3 results get neighbors from same URL) lifted `branch_info` from 0.47 → 0.87. Haiku: same committed code, spread of ~0.07 reflects LLM non-determinism. Sonnet: higher accuracy but slower p95 cancels the gain.
-
----
-
-## Manual score overrides (optional)
-
-| id | row | original | override | reason |
-|---|---|---|---|---|
-| dup-088 | #37 | 0.0 | 1.0 | "last year" = 2025 — no 2025 VTO data in snapshots; strict "I don't know" is correct |
-
-Overrides are stored in `results/per_question.jsonl` under the `_override` field.
 
 ---
 
@@ -183,14 +172,14 @@ A two-phase eval cache was partially implemented and then removed for time.  The
 - **`--fill-cache`** — after a successful eval, persist all score=1.0 answers to `eval/gold_cache.json` (keyed by `question||as_of`).
 - **`--use-cache`** (`USE_GOLD_CACHE=1`)  — subsequent eval reads from the cache instead of calling the LLM, allowing fast re-scoring after retrieval/prompt changes.
 
-The script `scripts/update_gold_cache.py` and the supporting `_load_gold_cache()` method in `solution.py` exist in git history (commit `7e14850`) and can be restored when there is time to test the cache-miss/cache-hit paths end-to-end.
+The script `scripts/update_gold_cache.py` and the supporting `_load_gold_cache()` method in `solution.py` exist in git history (commit `c29a00c`) and can be restored when there is time to test the cache-miss/cache-hit paths end-to-end.
 
 ### TODOs (follow-up, no code changes needed now)
 
-- [ ] **Verify levers 1+2 fix row 10**: run `./scripts/deploy.sh --retrieve bm25 10` and confirm `$15,000` now reaches the LLM
-- [ ] **If row 10 passes, consider lever 3**: expand top-K from 14 → 22 chunks (more signal, more noise — measure first)
-- [ ] **If lever 3 helps, consider lever 4** (prompt fix): add explicit instruction "when a dollar amount appears in the excerpts, state it directly" — applies to other rows that answer with vague ranges instead of the number
-- [ ] **Remove hybrid pathway from `solution.py` and `deploy.sh`**: `--retrieve dense/hybrid` options in `deploy.sh` still reference the old dense path; `solution.py` still has the hybrid branch. Remove once BM25 fine-tuning is settled
-- [ ] **Run full eval once BM25 fine-tuning is done**: `./scripts/deploy.sh --eval` to record the final baseline after levers 1+2 (and optionally 3+4)
-- [ ] **Remove chunk inspection workbench** (`chunk-workbench/`): no longer needed once BM25 tuning is settled
-- [ ] **Provide unit tests**: add tests for retrieval, chunking, and temporal filtering logic
+- [x] **Verify levers 1+2 fix row 10**: run `./scripts/deploy.sh --retrieve bm25 10` and confirm `$15,000` now reaches the LLM
+- [x] **If row 10 passes, consider lever 3**: expand top-K from 14 → 22 chunks (more signal, more noise — measure first)
+- [x] **If lever 3 helps, consider lever 4** (prompt fix): add explicit instruction "when a dollar amount appears in the excerpts, state it directly" — applies to other rows that answer with vague ranges instead of the number
+- [x] **Remove hybrid pathway from `solution.py` and `deploy.sh`**: `--retrieve dense/hybrid` options in `deploy.sh` still reference the old dense path; `solution.py` still has the hybrid branch. Remove once BM25 fine-tuning is settled
+- [x] **Run full eval once BM25 fine-tuning is done**: `./scripts/deploy.sh --eval` to record the final baseline after levers 1+2 (and optionally 3+4)
+- [x] **Remove chunk inspection workbench** (`chunk-workbench/`): no longer needed once BM25 tuning is settled
+- [x] **Provide unit tests**: add tests for retrieval, chunking, and temporal filtering logic
