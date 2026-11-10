@@ -62,18 +62,10 @@ import anthropic  # noqa: E402
 _WORD_RE = re.compile(r"[a-z0-9$%.]+")
 _PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
 _LOAN_TERM_RE = re.compile(r'\b(\d+)[- ]?years?\b', re.IGNORECASE)
-_VEHICLE_MODEL_YEAR_RE = re.compile(r'\b20\d{2}\s+model\b', re.IGNORECASE)
 
 
 def _normalize_loan_query(text: str) -> str:
-    """Convert 'N year(s)' loan terms to equivalent months so BM25 hits rate-table chunks.
-
-    Skip normalization when the query already contains a vehicle model year (e.g. '2019 model
-    motorcycle'). In that case the LLM rule lists all terms for the model year, so we don't
-    want BM25 to bias retrieval toward one specific term (e.g. 60 months vs 72 months).
-    """
-    if _VEHICLE_MODEL_YEAR_RE.search(text):
-        return text
+    """Convert 'N year(s)' loan terms to equivalent months so BM25 hits rate-table chunks."""
     return _LOAN_TERM_RE.sub(lambda m: f"{int(m.group(1)) * 12} months", text)
 _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
@@ -228,24 +220,6 @@ _URL_ALIASES: dict[str, tuple[str, str]] = {
 #     "[Iowa, Illinois and Wisconsin]" to any "charter area" chunk that doesn't
 #     already contain the state names, so BM25 retrieval now surfaces the right
 #     chunk and the LLM can cite the states directly.
-_KNOWN_FACTS: list[tuple[re.Pattern, str, str]] = [
-    (
-        re.compile(r'\bhow many branch', re.I),
-        "22 branch office locations.",
-        "Branch count rendered by JavaScript counter; crawled markdown shows "
-        "'#0' as placeholder (never the real value 22). Known fact substituted "
-        "because static-scraping cannot capture JS-rendered counters.",
-    ),
-    (
-        re.compile(r'how many dupaco employees used volunteer time off last year', re.I),
-        "294 employees (in 2023).",
-        "Question uses 'last year' with no as_of date; latest snapshot is 2026-09-28 so "
-        "'last year' = 2025, for which no VTO usage figure exists in the corpus. "
-        "Snapshots contain 2023 (294 employees) and 2024 (256 employees) figures. "
-        "Strict interpretation: answer is unknown. Eval expects 294 (2023). "
-        "Known answer substituted to match eval expectation.",
-    ),
-]
 
 _HIST_KW_RE = re.compile(
     r'\b(what year|when did|first introduc|founded|created|established|history of|origin'
@@ -540,19 +514,6 @@ class KnowledgeSystem:
                      for s in _ge.get("sources", []) if s.get("url")]
             return Answer(text=_ge["text"], confident=True, sources=_srcs or None)
 
-        # Known-fact overrides: pre-empt the LLM for questions where the corpus
-        # cannot yield the correct answer (JS counters, temporal ambiguity, etc.).
-        # Suppress with KNOWN_FACTS_DISABLED=1 to run the strict original rubric.
-        if not os.environ.get("KNOWN_FACTS_DISABLED"):
-            for pattern, known_answer, known_reason in _KNOWN_FACTS:
-                if pattern.search(question):
-                    if _base_key in self._answer_cache:
-                        print(f"  [cache-hit] {question[:60]!r}", flush=True)
-                        return self._answer_cache[_base_key]
-                    print(f"  [known-fact] {question[:60]!r} -> {known_answer!r}", flush=True)
-                    result = Answer(text=known_answer, confident=True, conflict_note=known_reason)
-                    self._answer_cache[_base_key] = result
-                    return result
 
         pool = self._chunks_as_of(as_of)
         if not pool:
@@ -650,20 +611,16 @@ class KnowledgeSystem:
             "or tier, list ALL available rates/options from the most recent official source. "
             "Do NOT ask for clarification. Do NOT say 'the question doesn't specify' — "
             "just provide the full list.\n"
-            "- When asked about auto, motorcycle, or vehicle loan rates for a specific "
-            "model year (e.g. '2019 model motorcycle'), ALWAYS list ALL available Months "
-            "rows and their APRs for that model year from the excerpts. "
-            "Loan rate tables use month-based tiers (60 Months, 72 Months, etc.) — "
-            "a year-based term in the question like '5 year' or '6 year' does NOT "
-            "correspond to exactly one tier. You MUST list every row that matches the "
-            "model year (e.g. '60 Months: 6.34% APR, 72 Months: 6.49% APR') regardless "
-            "of what loan duration the question mentions.\n"
             "- If asked generically about a product category (e.g. 'what checking accounts "
             "does Dupaco offer', 'what savings products'), enumerate ALL named product "
             "variants found in the excerpts. Never return just one variant when multiple exist.\n"
             "- When answering about a branch's status (open, closed, relocated), "
             "always state the specific date if one appears in the excerpts. "
             "Example: 'The Hy-Vee branch closed on March 31, 2026.'\n"
+            "- When answering about college scholarships or scholarship programs, "
+            "always include the total annual award amount if it appears anywhere in the excerpts "
+            "(e.g. a headline '$60,000 in college scholarships' or a stat box '# $60,000 / College Scholarships'). "
+            "Merge amount information from headlines and stat boxes with narrative descriptions.\n"
             "- Be concise. Members need a quick, accurate answer.\n"
             "- Do NOT invent numbers. Only state values that appear in the excerpts.\n"
             "- Never restate or echo the question back. Lead with the value or fact. "
