@@ -55,21 +55,23 @@ except ImportError:
 
 import anthropic  # noqa: E402
 
+from _preprocess import (  # noqa: E402
+    _normalize_loan_query, _expand_model_year_ranges, _expand_charter_area,
+    _expand_month_abbrevs, _tag_recreational_rows, _url_authority,
+)
+from _chunks import (  # noqa: E402
+    _Chunk, _MIN_CHUNK, _PCT_RE, _STEM_EXPAND,
+    _tokenize, _expand_tokens,
+    _merge_schedule_blocks, _join_short_paras, _chunk_para, _split_para,
+    _match_conflicts, _build_context, _detect_inline_conflict,
+)
+
 # ---------------------------------------------------------------------------
 # Constants
 # ---------------------------------------------------------------------------
 
-_WORD_RE = re.compile(r"[a-z0-9$%.]+")
-_PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
-_LOAN_TERM_RE = re.compile(r'\b(\d+)[- ]?years?\b', re.IGNORECASE)
-
-
-def _normalize_loan_query(text: str) -> str:
-    """Convert 'N year(s)' loan terms to equivalent months so BM25 hits rate-table chunks."""
-    return _LOAN_TERM_RE.sub(lambda m: f"{int(m.group(1)) * 12} months", text)
-_MAX_CHUNK = 700          # chars per chunk
-_MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
-_TOP_K     = 22           # chunks fed to the LLM
+_MAX_CHUNK = 700
+_TOP_K     = 22
 
 # Newsroom/blog metadata patterns that add noise without answerable content.
 # Applied paragraph-by-paragraph before chunking so they never reach BM25.
@@ -103,69 +105,6 @@ _GOLD_CACHE_PATH     = Path(__file__).parent / "eval" / "gold_cache.json"
 _GOLD_CACHE_TTL_DAYS = 90
 _DENSE_MODEL     = "all-MiniLM-L6-v2"
 _HYBRID_BM25_K   = 50   # BM25 candidates before dense re-rank in hybrid mode
-
-# Plural → singular + domain synonym expansion for BM25 query matching
-_STEM_EXPAND: dict[str, list[str]] = {
-    "branches": ["branch"],
-    "locations": ["location"],
-    "employees": ["employee"],
-    "offices": ["office"],
-    "tiers": ["tier"],
-    "accounts": ["account"],
-    "loans": ["loan"],
-    "members": ["member"],
-    "services": ["service"],
-    # Rate/APY synonyms — boost retrieval of numeric rate chunks
-    "rates": ["rate", "apy", "dividend"],
-    "interest": ["apy", "dividend", "rate"],
-    "apy": ["rate", "dividend", "interest"],
-    # Contact synonyms — help match phone/contact pages
-    "contact": ["phone", "call", "800"],
-    "update": ["change", "modify", "edit"],
-    "information": ["info", "details", "data"],
-    # Home$tart / grant synonyms
-    "grant": ["fhlb", "home$tart", "homebuyer", "assistance"],
-    "homebuyer": ["home$tart", "fhlb", "grant", "first-time"],
-    # Mortgage synonyms — "mortgage rates" should score home-loan rate table rows
-    # Bidirectional: "mortgage" query → "conventional" chunks; "conventional" docs → "mortgage" query term
-    "mortgage": ["home", "loan", "purchase", "refinance", "conventional"],
-    "mortgages": ["home", "loan", "purchase", "refinance", "conventional"],
-    "conventional": ["mortgage", "home", "loan"],  # rate rows use "conventional"; must match "mortgage" queries
-    # Auto loan synonyms — "2025 vehicle" should match "2024-27 Model Year"
-    "vehicle": ["auto", "car", "automobile"],
-    "vehicles": ["auto", "car", "automobile"],
-    # Loan amount ceiling — "largest/maximum loan" should match "borrow up to" chunks
-    "largest": ["maximum", "borrow", "limit"],
-    "maximum": ["largest", "borrow", "limit"],
-    # CD / certificate synonyms — savings-account page has certificate products
-    "certificate": ["cd", "savings", "share"],
-    "certificates": ["certificate", "cd", "savings"],
-    "cd": ["certificate", "savings", "share"],
-    # Credit card synonyms — "credit card rates" must reach /credit-cards pages, not /rates
-    "credit": ["visa", "card", "platinum", "rewards"],
-    "cards": ["card", "visa", "credit"],
-    # APR synonyms — "aprs" (plural from "their APRs") must match "apr" and "rate" in chunks
-    "aprs": ["apr", "rate", "apy"],
-    "apr": ["aprs", "rate", "apy"],
-    # Mobile wallet synonyms — boost Apple/Google/Samsung Pay chunks for wallet queries
-    "wallet": ["apple", "pay", "google", "samsung"],
-    # Recognition synonyms — "recognition" in query should match "recognized/recognizes" in chunks
-    "recognition": ["recognized", "recognizing", "recognizes", "recognitions"],
-    "recognized": ["recognition", "recognizing"],
-    # Founder/history synonyms — "who founded" should match about/history chunks
-    "founder": ["employees", "meatpacking", "started", "history"],
-    # Loan term months plural/singular
-    "months": ["month"],
-    "month": ["months"],
-    # Vehicle model year range expansion — maps a query year to the range-boundary tokens
-    # that appear in rate-table chunks ("2017-20 Model Year" → tokens "2017","20" etc.)
-    "2018": ["2017", "2020"],
-    "2019": ["2017", "2020"],
-    "2020": ["2017"],
-    "2022": ["2021"],
-    "2024": ["2023", "2026"],
-    "2025": ["2023", "2026"],
-}
 
 _RATE_TERMS = {"rate", "rates", "apy", "dividend", "interest", "percent", "%"}
 
@@ -229,119 +168,6 @@ _HIST_KW_RE = re.compile(
     re.I,
 )
 _YEAR_IN_TEXT_RE = re.compile(r'\b(19|20)\d{2}\b')
-
-_YEAR_RANGE_EXPAND_RE = re.compile(r'\b(\d{4})-(\d{2})\s+Model\s+Year\b', re.I)
-
-
-def _expand_model_year_ranges(text: str) -> str:
-    """Append individual years to abbreviated year-range tokens in chunk text.
-
-    "2024-27 Model Year" → "2024-27 Model Year [2025 2026 2027]"
-    Lets BM25 match a query about any specific year within the range.
-    """
-    def _expand(m: re.Match) -> str:
-        start = int(m.group(1))
-        suffix = int(m.group(2))
-        end = (start // 100) * 100 + suffix
-        if end <= start:
-            end += 100
-        present = set(re.findall(r'\b\d{4}\b', m.group(0)))
-        to_add = [str(y) for y in range(start, end + 1) if str(y) not in present]
-        return (m.group(0) + " [" + " ".join(to_add) + "]") if to_add else m.group(0)
-    return _YEAR_RANGE_EXPAND_RE.sub(_expand, text)
-
-
-_CHARTER_AREA_RE = re.compile(r'\bcharter\s+area\b', re.I)
-
-
-def _expand_charter_area(text: str) -> str:
-    """Append state names to 'charter area' when not already present in the chunk.
-
-    'You live or work within our charter area.' →
-    'You live or work within our charter area [Iowa, Illinois and Wisconsin].'
-    Lets BM25 match eligibility queries that name specific states.
-    """
-    if not _CHARTER_AREA_RE.search(text):
-        return text
-    if re.search(r'\b(Iowa|Illinois|Wisconsin)\b', text, re.I):
-        return text
-    return _CHARTER_AREA_RE.sub('charter area [Iowa, Illinois and Wisconsin]', text)
-
-
-_MONTH_ABBREV: dict[str, str] = {
-    "Jan": "January", "Feb": "February", "Mar": "March", "Apr": "April",
-    "Jun": "June",    "Jul": "July",     "Aug": "August", "Sep": "September",
-    "Oct": "October", "Nov": "November", "Dec": "December",
-}
-_MONTH_ABBREV_RE = re.compile(
-    r'\b(' + '|'.join(_MONTH_ABBREV) + r')\.\s+(\d{1,2}),\s+(\d{4})\b'
-)
-
-
-def _expand_month_abbrevs(text: str) -> str:
-    """Replace abbreviated month dates with the full month name.
-
-    "Oct. 1, 2024" → "October 1, 2024"
-    Lets the LLM echo back the full form required by must_include checks.
-    """
-    return _MONTH_ABBREV_RE.sub(
-        lambda m: f"{_MONTH_ABBREV[m.group(1)]} {m.group(2)}, {m.group(3)}", text
-    )
-
-
-_RECREATIONAL_YEAR_RE = re.compile(r'\bModel\s+Year\s+\d{4}-\d{2}\b', re.I)
-
-
-def _tag_recreational_rows(text: str) -> str:
-    """Append a category tag to ATV/snowmobile/jet-ski rate rows.
-
-    Rows like "Model Year 2020-19 | 60 Months | 8.94%" use reversed year
-    notation exclusively for recreational (ATV/snowmobile/jet ski) loans, NOT
-    auto or motorcycle loans. Tagging them prevents the LLM from confusing them
-    with motorcycle loan rates.
-    """
-    if _RECREATIONAL_YEAR_RE.search(text):
-        return text + " [ATV snowmobile jet ski recreational loan — not auto not motorcycle]"
-    return text
-
-
-def _url_authority(url: str) -> int:
-    """Higher = more authoritative source."""
-    u = url.lower()
-    if any(x in u for x in ["/newsroom/", "/blog/", "/press", "/news/"]):
-        return 1          # stale marketing content
-    if any(x in u for x in ["calculator", "calc", "affordability", "tool"]):
-        return 2          # calculators often lag official pages
-    if any(x in u for x in [
-        "/personal/loans/", "/personal/savings", "/personal/credit",
-        "/personal/checking", "/personal/mortgages",
-        "/business/loans/", "/business/savings", "/business/credit",
-        "/rates", "/rate-", "#rates",
-    ]):
-        return 5          # official product / rate pages
-    if any(x in u for x in ["/personal/", "/business/"]):
-        return 4
-    if "/about" in u:
-        return 4
-    return 3
-
-
-# ---------------------------------------------------------------------------
-# Data record
-# ---------------------------------------------------------------------------
-
-class _Chunk:
-    __slots__ = ("url", "title", "snapshot_id", "taken_on", "text", "authority")
-
-    def __init__(self, url: str, title: str, snapshot_id: str,
-                 taken_on: str, text: str):
-        self.url         = url
-        self.title       = title
-        self.snapshot_id = snapshot_id
-        self.taken_on    = taken_on
-        self.text        = text
-        self.authority   = _url_authority(url)
-
 
 # ---------------------------------------------------------------------------
 # Main class
@@ -962,190 +788,6 @@ class KnowledgeSystem:
                         ),
                     ))
 
-
-# ---------------------------------------------------------------------------
-# Module-level helpers
-# ---------------------------------------------------------------------------
-
-def _tokenize(text: str) -> list[str]:
-    return _WORD_RE.findall(text.lower())
-
-
-def _expand_tokens(tokens: list[str]) -> list[str]:
-    """Add singular forms for plural query tokens so BM25 matches both."""
-    extra: list[str] = []
-    for t in tokens:
-        for singular in _STEM_EXPAND.get(t, []):
-            if singular not in tokens:
-                extra.append(singular)
-    return tokens + extra
-
-
-_SCHEDULE_LINE_RE = re.compile(
-    r'\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b'
-    r'.*?(\d{1,2}:\d{2}\s*[ap]\.m\.|noon|midnight|closed|ATM)',
-    re.IGNORECASE | re.DOTALL,
-)
-
-
-def _merge_schedule_blocks(paras: list[str]) -> list[str]:
-    """Merge consecutive day/time schedule lines into one paragraph.
-
-    Blank lines between schedule rows in source HTML cause each line to become
-    its own paragraph; without this merge, 'noon' (Saturday) ends up in a chunk
-    that has no 'Lobby' context, making BM25 unable to surface it for hour queries.
-
-    Only fires when a paragraph contains both a day name and a time/status token
-    (8:30 a.m., noon, closed, ATM) — narrow enough to avoid false positives on
-    news articles or rate tables.
-    """
-    def _is_schedule(p: str) -> bool:
-        return bool(_SCHEDULE_LINE_RE.search(p))
-
-    result: list[str] = []
-    i = 0
-    while i < len(paras):
-        p = paras[i]
-        if _is_schedule(p):
-            group = [p]
-            j = i + 1
-            while j < len(paras) and _is_schedule(paras[j]):
-                group.append(paras[j])
-                j += 1
-            if result and not _is_schedule(result[-1]):
-                header = result.pop()
-                result.append(header + "\n" + "\n".join(group))
-            else:
-                result.append("\n".join(group))
-            i = j
-        else:
-            result.append(p)
-            i += 1
-    return result
-
-
-def _join_short_paras(paras: list[str], threshold: int = 80) -> list[str]:
-    """Merge a short paragraph into the next one so headers stay with their content.
-
-    Prevents "**Lobby**" and "Monday-Friday: 8:30 a.m.–5:30 p.m." from becoming
-    separate zero-context chunks that BM25 cannot match against hour queries.
-    """
-    result: list[str] = []
-    i = 0
-    while i < len(paras):
-        p = paras[i]
-        if len(p) < threshold and i + 1 < len(paras) and paras[i + 1]:
-            result.append(p + "\n" + paras[i + 1])
-            i += 2
-        else:
-            result.append(p)
-            i += 1
-    return result
-
-
-def _chunk_para(text: str, max_len: int) -> list[str]:
-    """Chunk a paragraph; tables get header+each-row treatment."""
-    lines = text.splitlines()
-    table_lines = [l for l in lines if l.strip().startswith("|")]
-    if len(table_lines) >= 2:
-        header = table_lines[0]
-        data_rows = [l for l in table_lines[2:] if l.strip().startswith("|")]
-        chunks = []
-        for row in data_rows:
-            combined = f"{header}\n{row}"
-            if len(combined) >= _MIN_CHUNK:
-                chunks.append(combined)
-        return chunks if chunks else [text[:max_len]]
-    return _split_para(text, max_len)
-
-
-def _split_para(text: str, max_len: int) -> list[str]:
-    """Split a paragraph into sub-chunks at sentence boundaries."""
-    if len(text) <= max_len:
-        return [text]
-    sentences = re.split(r"(?<=[.!?])\s+", text)
-    chunks: list[str] = []
-    current = ""
-    for s in sentences:
-        if current and len(current) + len(s) + 1 > max_len:
-            chunks.append(current.strip())
-            current = s
-        else:
-            current = (current + " " + s).strip() if current else s
-    if current:
-        chunks.append(current.strip())
-    return [c for c in chunks if len(c) >= _MIN_CHUNK]
-
-
-_HISTORY_RE = re.compile(
-    r'\b(previous|prior|before|changed|used to|formerly|was|past|old|historic|'
-    r'earlier|previously|update|any.*pay)\b', re.I
-)
-
-def _match_conflicts(conflicts: list[Conflict], question: str) -> list[Conflict]:
-    """Return conflicts relevant to this question.
-
-    Conservative: only injects when the question asks about a historical change
-    (keywords: previously, changed, used to, etc.) OR explicitly mentions one of
-    the specific conflict values (e.g., '0.35%').  Avoids injecting old rates
-    into general rate questions, which causes stale-trap hits.
-    """
-    asks_history = bool(_HISTORY_RE.search(question))
-    matched: list[Conflict] = []
-    for c in conflicts:
-        if asks_history:
-            matched.append(c)
-        else:
-            # Only match when question literally contains one of the conflict values
-            for val in c.values:
-                if val in question:
-                    matched.append(c)
-                    break
-    return matched[:4]   # cap to avoid bloating context
-
-
-def _build_context(chunks: list[_Chunk]) -> str:
-    parts = []
-    for c in chunks:
-        auth_label = {5: "official rate page", 4: "product page",
-                      3: "general page", 2: "calculator", 1: "blog/news"}.get(
-            c.authority, "page")
-        parts.append(
-            f"[Source: {c.url} | Snapshot: {c.taken_on} | Type: {auth_label}]\n{c.text}"
-        )
-    return "\n\n---\n\n".join(parts)
-
-
-def _detect_inline_conflict(chunks: list[_Chunk], question: str) -> Optional[str]:
-    """
-    If multiple retrieved chunks contain different percentage values AND
-    have different authority levels, return a brief conflict note.
-    """
-    pcts_by_url: dict[str, set[str]] = {}
-    for c in chunks:
-        pcts = set(_PCT_RE.findall(c.text))
-        if pcts:
-            pcts_by_url.setdefault(c.url, set()).update(pcts)
-
-    all_pcts: list[tuple[str, str]] = []
-    for url, pcts in pcts_by_url.items():
-        for p in pcts:
-            all_pcts.append((p, url))
-
-    # Collect unique rate values
-    unique_vals = {p for p, _ in all_pcts}
-    if len(unique_vals) < 2:
-        return None
-
-    # Only flag if authority spread is high (official page vs calculator)
-    auth_values = {_url_authority(url) for _, url in all_pcts}
-    if max(auth_values) - min(auth_values) >= 3:
-        vals = sorted(unique_vals)[:4]
-        return (
-            f"Conflicting values found across pages: {', '.join(vals)}. "
-            "Official rate page value used."
-        )
-    return None
 
 
 # ---------------------------------------------------------------------------
