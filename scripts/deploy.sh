@@ -154,10 +154,6 @@ if [[ "${POSITIONAL[0]:-}" == "--eval" ]]; then
   cp "$RESULTS_DIR/per_question.jsonl" "$RUNS_DIR/run_${RUN_TS}.jsonl" 2>/dev/null || true
   cp "$RESULTS_DIR/report.json"        "$RUNS_DIR/report_${RUN_TS}.json" 2>/dev/null || true
   echo "==> Run archived to $RUNS_DIR/run_${RUN_TS}.jsonl"
-  echo "==> Updating gold cache"
-  "$PY" "$REPO_DIR/scripts/update_gold_cache.py" \
-    "$RESULTS_DIR/per_question.jsonl" \
-    "$KIT_DIR/eval/public_eval.jsonl"
   echo "==> Rebuilding comparison report"
   "$PY" "$REPO_DIR/scripts/build_report.py"
   echo "==> Done — results/comparison.html updated"
@@ -189,7 +185,6 @@ elif [[ "${POSITIONAL[0]:-}" == "--custom-eval" ]]; then
   cp "$RESULTS_DIR/per_question.jsonl" "$RUNS_DIR/run_${RUN_TS}_custom.jsonl" 2>/dev/null || true
   cp "$RESULTS_DIR/report.json"        "$RUNS_DIR/report_${RUN_TS}_custom.json" 2>/dev/null || true
   echo "==> Run archived to $RUNS_DIR/run_${RUN_TS}_custom.jsonl"
-  echo ""
   echo "==> Custom question breakdown (cust-*):"
   "$PY" -c "
 import json
@@ -209,11 +204,6 @@ else:
     scores = [r.get('score',0) for r in custom]
     print(f'  --- custom avg: {sum(scores)/len(scores):.4f} over {len(custom)} questions')
 "
-  echo "==> Updating gold cache"
-  "$PY" "$REPO_DIR/scripts/update_gold_cache.py" \
-    "$RESULTS_DIR/per_question.jsonl" \
-    "$KIT_DIR/eval/public_eval.jsonl" \
-    "$REPO_DIR/eval/custom_eval.jsonl"
   echo "==> Rebuilding comparison report"
   "$PY" "$REPO_DIR/scripts/build_report.py"
   echo "==> Done — results/comparison.html updated"

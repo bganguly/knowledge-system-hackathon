@@ -180,6 +180,16 @@ Snapshot data is from a real credit union and must not be committed. `.gitignore
 2. **Eval comparison tooling** — `scripts/build_report.py` + `results/comparison.html` with run-filter UI, WIP columns, per-row drill-down, and score timeline were not in scope but became essential for diagnosing which rows regressed after each change. Without this, reverting to the best run would have been guesswork.
 3. **Root-cause debugging** — the row 10 `$15,000` miss was not "wrong answer" noise; it required tracing through chunk ranking to find that 6 of 22 retrieval slots were consumed by boilerplate from a single newsroom URL, pushing the relevant body paragraph to rank 23+.
 
+### Future work: gold answer cache
+
+A two-phase eval cache was partially implemented and then removed for time.  The idea:
+
+- **Normal run** — every question makes a fresh LLM call; no cache read or write.
+- **`--fill-cache`** — after a successful eval, persist all score=1.0 answers to `eval/gold_cache.json` (keyed by `question||as_of`).
+- **`--use-cache`** (`USE_GOLD_CACHE=1`)  — subsequent eval reads from the cache instead of calling the LLM, allowing fast re-scoring after retrieval/prompt changes.
+
+The script `scripts/update_gold_cache.py` and the supporting `_load_gold_cache()` method in `solution.py` exist in git history (commit `7e14850`) and can be restored when there is time to test the cache-miss/cache-hit paths end-to-end.
+
 ### TODOs (follow-up, no code changes needed now)
 
 - [ ] **Verify levers 1+2 fix row 10**: run `./scripts/deploy.sh --retrieve bm25 10` and confirm `$15,000` now reaches the LLM
