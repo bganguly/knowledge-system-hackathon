@@ -62,10 +62,18 @@ import anthropic  # noqa: E402
 _WORD_RE = re.compile(r"[a-z0-9$%.]+")
 _PCT_RE  = re.compile(r"\b\d+\.\d{1,3}%")   # percentage values e.g. "5.39%"
 _LOAN_TERM_RE = re.compile(r'\b(\d+)[- ]?years?\b', re.IGNORECASE)
+_VEHICLE_MODEL_YEAR_RE = re.compile(r'\b20\d{2}\s+model\b', re.IGNORECASE)
 
 
 def _normalize_loan_query(text: str) -> str:
-    """Convert 'N year(s)' loan terms to equivalent months so BM25 hits rate-table chunks."""
+    """Convert 'N year(s)' loan terms to equivalent months so BM25 hits rate-table chunks.
+
+    Skip normalization when the query already contains a vehicle model year (e.g. '2019 model
+    motorcycle'). In that case the LLM rule lists all terms for the model year, so we don't
+    want BM25 to bias retrieval toward one specific term (e.g. 60 months vs 72 months).
+    """
+    if _VEHICLE_MODEL_YEAR_RE.search(text):
+        return text
     return _LOAN_TERM_RE.sub(lambda m: f"{int(m.group(1)) * 12} months", text)
 _MAX_CHUNK = 700          # chars per chunk
 _MIN_CHUNK = 20           # skip tiny fragments (lowered to catch table rows)
@@ -307,6 +315,22 @@ def _expand_month_abbrevs(text: str) -> str:
     )
 
 
+_RECREATIONAL_YEAR_RE = re.compile(r'\bModel\s+Year\s+\d{4}-\d{2}\b', re.I)
+
+
+def _tag_recreational_rows(text: str) -> str:
+    """Append a category tag to ATV/snowmobile/jet-ski rate rows.
+
+    Rows like "Model Year 2020-19 | 60 Months | 8.94%" use reversed year
+    notation exclusively for recreational (ATV/snowmobile/jet ski) loans, NOT
+    auto or motorcycle loans. Tagging them prevents the LLM from confusing them
+    with motorcycle loan rates.
+    """
+    if _RECREATIONAL_YEAR_RE.search(text):
+        return text + " [ATV snowmobile jet ski recreational loan — not auto not motorcycle]"
+    return text
+
+
 def _url_authority(url: str) -> int:
     """Higher = more authoritative source."""
     u = url.lower()
@@ -429,6 +453,7 @@ class KnowledgeSystem:
                     sub = _expand_model_year_ranges(sub)
                     sub = _expand_charter_area(sub)
                     sub = _expand_month_abbrevs(sub)
+                    sub = _tag_recreational_rows(sub)
                     if len(sub) >= _MIN_CHUNK and sub not in seen_in_page:
                         seen_in_page.add(sub)
                         snap_chunks.append(_Chunk(
@@ -625,6 +650,14 @@ class KnowledgeSystem:
             "or tier, list ALL available rates/options from the most recent official source. "
             "Do NOT ask for clarification. Do NOT say 'the question doesn't specify' — "
             "just provide the full list.\n"
+            "- When asked about auto, motorcycle, or vehicle loan rates for a specific "
+            "model year (e.g. '2019 model motorcycle'), ALWAYS list ALL available Months "
+            "rows and their APRs for that model year from the excerpts. "
+            "Loan rate tables use month-based tiers (60 Months, 72 Months, etc.) — "
+            "a year-based term in the question like '5 year' or '6 year' does NOT "
+            "correspond to exactly one tier. You MUST list every row that matches the "
+            "model year (e.g. '60 Months: 6.34% APR, 72 Months: 6.49% APR') regardless "
+            "of what loan duration the question mentions.\n"
             "- If asked generically about a product category (e.g. 'what checking accounts "
             "does Dupaco offer', 'what savings products'), enumerate ALL named product "
             "variants found in the excerpts. Never return just one variant when multiple exist.\n"
