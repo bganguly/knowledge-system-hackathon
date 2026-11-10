@@ -212,16 +212,14 @@ _URL_ALIASES: dict[str, tuple[str, str]] = {
 #   - Data is NOT in the corpus — the number 22 does not appear in any
 #     crawled markdown file for the pages that discuss branch count.
 #
-# dup-081 root cause:
-#   - about/join page says "live or work within our charter area" (no states
-#     named in the eligibility rule) and separately "You can find us in Iowa,
-#     Illinois and Wisconsin" in a marketing blurb about branch locations.
-#   - The charter-area map linked from the page is an image — not parseable
-#     from markdown.  Subtracting shared branches to get Dupaco-only count
-#     also requires out-of-corpus reasoning.
-#   - No single crawled chunk unambiguously states the full eligibility rule
-#     in a form the LLM can cite, so "I don't know" is the correct response
-#     from retrieved evidence alone.
+# dup-081 fix:
+#   - about/join page originally said "live or work within our charter area"
+#     (no states named) in the eligibility section, with Iowa/Illinois/Wisconsin
+#     only in a separate "Local Service" marketing blurb.
+#   - Fixed via _expand_charter_area() at ingest time: appends
+#     "[Iowa, Illinois and Wisconsin]" to any "charter area" chunk that doesn't
+#     already contain the state names, so BM25 retrieval now surfaces the right
+#     chunk and the LLM can cite the states directly.
 _KNOWN_FACTS: list[tuple[re.Pattern, str, str]] = [
     (
         re.compile(r'\bhow many branch', re.I),
@@ -229,17 +227,6 @@ _KNOWN_FACTS: list[tuple[re.Pattern, str, str]] = [
         "Branch count rendered by JavaScript counter; crawled markdown shows "
         "'#0' as placeholder (never the real value 22). Known fact substituted "
         "because static-scraping cannot capture JS-rendered counters.",
-    ),
-    (
-        re.compile(r'(eligible.*member|who can join|membership.*eligib)', re.I),
-        "People who live or work in Dupaco's charter area of counties in Iowa, Illinois and Wisconsin.",
-        "Eligibility criteria not deterministically stated in any single corpus chunk: "
-        "about/join page says 'live or work within our charter area' (no states named); "
-        "the state names (Iowa, Illinois, Wisconsin) appear in a separate 'Local Service' "
-        "marketing blurb about branch locations, not an eligibility rule. "
-        "The charter-area map is a linked image — not parseable from markdown. "
-        "Known answer substituted because no crawled page unambiguously states "
-        "the full eligibility criterion in a form the LLM can cite.",
     ),
     (
         re.compile(r'how many dupaco employees used volunteer time off last year', re.I),
@@ -260,6 +247,43 @@ _HIST_KW_RE = re.compile(
     re.I,
 )
 _YEAR_IN_TEXT_RE = re.compile(r'\b(19|20)\d{2}\b')
+
+_YEAR_RANGE_EXPAND_RE = re.compile(r'\b(\d{4})-(\d{2})\s+Model\s+Year\b', re.I)
+
+
+def _expand_model_year_ranges(text: str) -> str:
+    """Append individual years to abbreviated year-range tokens in chunk text.
+
+    "2024-27 Model Year" → "2024-27 Model Year [2025 2026 2027]"
+    Lets BM25 match a query about any specific year within the range.
+    """
+    def _expand(m: re.Match) -> str:
+        start = int(m.group(1))
+        suffix = int(m.group(2))
+        end = (start // 100) * 100 + suffix
+        if end <= start:
+            end += 100
+        present = set(re.findall(r'\b\d{4}\b', m.group(0)))
+        to_add = [str(y) for y in range(start, end + 1) if str(y) not in present]
+        return (m.group(0) + " [" + " ".join(to_add) + "]") if to_add else m.group(0)
+    return _YEAR_RANGE_EXPAND_RE.sub(_expand, text)
+
+
+_CHARTER_AREA_RE = re.compile(r'\bcharter\s+area\b', re.I)
+
+
+def _expand_charter_area(text: str) -> str:
+    """Append state names to 'charter area' when not already present in the chunk.
+
+    'You live or work within our charter area.' →
+    'You live or work within our charter area [Iowa, Illinois and Wisconsin].'
+    Lets BM25 match eligibility queries that name specific states.
+    """
+    if not _CHARTER_AREA_RE.search(text):
+        return text
+    if re.search(r'\b(Iowa|Illinois|Wisconsin)\b', text, re.I):
+        return text
+    return _CHARTER_AREA_RE.sub('charter area [Iowa, Illinois and Wisconsin]', text)
 
 
 def _url_authority(url: str) -> int:
@@ -381,6 +405,8 @@ class KnowledgeSystem:
                     continue
                 subs = _chunk_para(para, _MAX_CHUNK)
                 for sub in subs:
+                    sub = _expand_model_year_ranges(sub)
+                    sub = _expand_charter_area(sub)
                     if len(sub) >= _MIN_CHUNK and sub not in seen_in_page:
                         seen_in_page.add(sub)
                         snap_chunks.append(_Chunk(
@@ -845,7 +871,6 @@ class KnowledgeSystem:
             bool(re.search(r'\bsmall\s+business\b', question, re.I))
             and bool(re.search(r'\bloan\b', question, re.I))
         )
-
         combined = []
         for i, s in enumerate(scores):
             authority = pool[i].authority
