@@ -190,3 +190,8 @@ The script `scripts/update_gold_cache.py` and the supporting `_load_gold_cache()
 - [x] **Run full eval once BM25 fine-tuning is done**: `./scripts/deploy.sh --eval` to record the final baseline after levers 1+2 (and optionally 3+4)
 - [x] **Remove chunk inspection workbench** (`chunk-workbench/`): no longer needed once BM25 tuning is settled
 - [x] **Provide unit tests**: add tests for retrieval, chunking, and temporal filtering logic
+
+### Dead code to remove (future cleanup)
+
+- [ ] **`solution.py` dense/hybrid retrieval pathway** — `_retrieve_dense` (L629), `_retrieve_hybrid` (L634), the dispatch branches in `_retrieve` (L559–562), `_HAS_ST` import guard (L50–54), `_HYBRID_BM25_K` constant (L106), and the embed pre-warm guard (L249); `_RETRIEVAL_MODE` env var (L102) can be removed or hardcoded to `"bm25"`
+- [ ] **`scripts/deploy.sh` `--retrieve` flag** — usage docs (L13–33), validation loop (L50–51), and `RETRIEVAL_MODE` export logic (L138–139, L161–162, L213) all reference `dense`/`hybrid` modes that no longer work
