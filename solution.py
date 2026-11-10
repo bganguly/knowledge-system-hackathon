@@ -286,6 +286,27 @@ def _expand_charter_area(text: str) -> str:
     return _CHARTER_AREA_RE.sub('charter area [Iowa, Illinois and Wisconsin]', text)
 
 
+_MONTH_ABBREV: dict[str, str] = {
+    "Jan": "January", "Feb": "February", "Mar": "March", "Apr": "April",
+    "Jun": "June",    "Jul": "July",     "Aug": "August", "Sep": "September",
+    "Oct": "October", "Nov": "November", "Dec": "December",
+}
+_MONTH_ABBREV_RE = re.compile(
+    r'\b(' + '|'.join(_MONTH_ABBREV) + r')\.\s+(\d{1,2}),\s+(\d{4})\b'
+)
+
+
+def _expand_month_abbrevs(text: str) -> str:
+    """Replace abbreviated month dates with the full month name.
+
+    "Oct. 1, 2024" → "October 1, 2024"
+    Lets the LLM echo back the full form required by must_include checks.
+    """
+    return _MONTH_ABBREV_RE.sub(
+        lambda m: f"{_MONTH_ABBREV[m.group(1)]} {m.group(2)}, {m.group(3)}", text
+    )
+
+
 def _url_authority(url: str) -> int:
     """Higher = more authoritative source."""
     u = url.lower()
@@ -407,6 +428,7 @@ class KnowledgeSystem:
                 for sub in subs:
                     sub = _expand_model_year_ranges(sub)
                     sub = _expand_charter_area(sub)
+                    sub = _expand_month_abbrevs(sub)
                     if len(sub) >= _MIN_CHUNK and sub not in seen_in_page:
                         seen_in_page.add(sub)
                         snap_chunks.append(_Chunk(
