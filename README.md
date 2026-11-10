@@ -49,6 +49,13 @@ python harness/run_eval.py \
 ./scripts/deploy.sh /other/path/to/kit claude-sonnet-4-5
 ```
 
+**Unit tests** — activate the project venv first:
+
+```bash
+source .venv/bin/activate
+python3 -m pytest tests/ -v
+```
+
 ---
 
 ## Latest eval stats
